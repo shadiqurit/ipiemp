@@ -463,14 +463,15 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
       .map(row => cleanObj(row, EXAM_COLUMNS))
       .filter(row => EXAM_COLUMNS.some(column => row[column]));
 
-    for (const row of normalizedEducation) {
+    for (const [index, row] of normalizedEducation.entries()) {
       await conn.execute(
         `INSERT INTO hr_empexamdet
-         (EMP_ENTRY_ID, EMPCODE, EXAMNAME, EXAMGROUP, BOARD, CLAS,
+         (EMP_ENTRY_ID, SLNO, EMPCODE, EXAMNAME, EXAMGROUP, BOARD, CLAS,
           PASSYEAR, REMARKS, INSTITUTE, SUBJECT_NAME)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           empEntryId,
+          index + 1,
           ipi || null,
           row.EXAMNAME || null,
           row.EXAMGROUP || null,

@@ -86,7 +86,8 @@ CREATE TABLE up_emp (
 ) ENGINE=InnoDB;
 
 CREATE TABLE hr_empexamdet (
-  SLNO          BIGINT NOT NULL AUTO_INCREMENT,
+  -- Education sequence is unique only within one employee.
+  SLNO          BIGINT NOT NULL,
 
   -- Internal relational key; always available even before IPI assignment.
   EMP_ENTRY_ID  BIGINT NOT NULL,
@@ -103,7 +104,7 @@ CREATE TABLE hr_empexamdet (
   INSTITUTE     VARCHAR(500),
   SUBJECT_NAME VARCHAR(200),
 
-  PRIMARY KEY (SLNO),
+  PRIMARY KEY (EMP_ENTRY_ID, SLNO),
   KEY IX_EXAM_ENTRY (EMP_ENTRY_ID),
   KEY IX_EXAM_EMPCODE (EMPCODE),
 

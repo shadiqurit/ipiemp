@@ -215,3 +215,10 @@ mysql -u root -p < database/schema.sql
 ```
 
 If you already have real data in the earlier MySQL schema, do not drop it. Create a migration script instead.
+
+### Education row numbering
+
+Education `SLNO` is numbered separately for each employee: every employee's
+first education row is `1`, then `2`, `3`, and so on. For an existing
+database, run `database/migration_per_employee_education_slno.sql` once before
+deploying this change.
