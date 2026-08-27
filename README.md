@@ -188,6 +188,11 @@ Redeploy each project whenever its environment variables change. Do not use
 exact frontend origin. A trailing slash is accepted, but this is the preferred
 form: `https://YOUR-FRONTEND.vercel.app`.
 
+If Aiven requires its private CA certificate, add `DB_SSL_CA` to the API
+project. Its value is the complete PEM content, including the `BEGIN
+CERTIFICATE` and `END CERTIFICATE` lines. Multiline text and literal `\n` line
+breaks are both supported.
+
 To create the initial admin against the production database, download the API
 project's Vercel Production variables locally, run the command below from
 `backend`, then remove the downloaded `.env` file:
