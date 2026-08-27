@@ -57,7 +57,7 @@ router.post('/login', async (req, res, next) => {
 
     const [rows] = await pool.execute(
       `SELECT *
-         FROM ADMIN_USER
+         FROM admin_user
         WHERE USERNAME = ?
           AND ACTIVE_YN = 'Y'
         LIMIT 1`,
@@ -91,7 +91,7 @@ router.get('/users', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       `SELECT USER_ID, USERNAME, DISPLAY_NAME, ACTIVE_YN, CREATED_AT
-         FROM ADMIN_USER
+         FROM admin_user
         ORDER BY CREATED_AT DESC, USER_ID DESC`
     );
 
@@ -122,7 +122,7 @@ router.post('/users', async (req, res, next) => {
     const hash = await bcrypt.hash(password, 12);
 
     await pool.execute(
-      `INSERT INTO ADMIN_USER (USERNAME, PASSWORD_HASH, DISPLAY_NAME)
+      `INSERT INTO admin_user (USERNAME, PASSWORD_HASH, DISPLAY_NAME)
        VALUES (?, ?, ?)`,
       [username, hash, displayName || username]
     );
@@ -154,7 +154,7 @@ router.patch('/users/:userId/password', async (req, res, next) => {
   try {
     const hash = await bcrypt.hash(password, 12);
     const [result] = await pool.execute(
-      `UPDATE ADMIN_USER
+      `UPDATE admin_user
           SET PASSWORD_HASH = ?, ACTIVE_YN = 'Y'
         WHERE USER_ID = ?`,
       [hash, userId]
@@ -174,7 +174,7 @@ router.get('/batches', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       `SELECT *
-         FROM HR_BATCH_CONTROL
+         FROM hr_batch_control
         ORDER BY CREATED_AT DESC`
     );
 
@@ -195,7 +195,7 @@ router.post('/batches', async (req, res, next) => {
 
   try {
     await pool.execute(
-      `INSERT INTO HR_BATCH_CONTROL
+      `INSERT INTO hr_batch_control
        (BATCH_NO, STATUS, CREATED_BY)
        VALUES (?, 'INACTIVE', ?)`,
       [batchNo, req.admin.username]
@@ -224,13 +224,13 @@ router.patch('/batches/:batchNo/status', async (req, res, next) => {
 
     await conn.query(
       `SELECT BATCH_NO
-         FROM HR_BATCH_CONTROL
+         FROM hr_batch_control
         FOR UPDATE`
     );
 
     if (status === 'ACTIVE') {
       await conn.execute(
-        `UPDATE HR_BATCH_CONTROL
+        `UPDATE hr_batch_control
             SET STATUS = 'INACTIVE',
                 CLOSED_AT = NOW()
           WHERE STATUS = 'ACTIVE'
@@ -239,7 +239,7 @@ router.patch('/batches/:batchNo/status', async (req, res, next) => {
       );
 
       await conn.execute(
-        `UPDATE HR_BATCH_CONTROL
+        `UPDATE hr_batch_control
             SET STATUS = 'ACTIVE',
                 STARTED_AT = COALESCE(STARTED_AT, NOW()),
                 CLOSED_AT = NULL,
@@ -250,7 +250,7 @@ router.patch('/batches/:batchNo/status', async (req, res, next) => {
 
     } else {
       await conn.execute(
-        `UPDATE HR_BATCH_CONTROL
+        `UPDATE hr_batch_control
             SET STATUS = 'INACTIVE',
                 CLOSED_AT = NOW(),
                 UPDATED_AT = NOW()
@@ -312,7 +312,7 @@ router.get('/employees', async (req, res, next) => {
               e.batch_no,
               e.CREATED_AT,
               e.UPDATED_AT
-         FROM UP_EMP e
+         FROM up_emp e
          ${where}
         ORDER BY e.CREATED_AT DESC, e.EMP_ENTRY_ID DESC`,
       params
@@ -334,7 +334,7 @@ router.get('/employees/:empEntryId', async (req, res, next) => {
 
   try {
     const [employees] = await pool.execute(
-      `SELECT * FROM UP_EMP WHERE EMP_ENTRY_ID = ? LIMIT 1`,
+      `SELECT * FROM up_emp WHERE EMP_ENTRY_ID = ? LIMIT 1`,
       [empEntryId]
     );
 
@@ -345,7 +345,7 @@ router.get('/employees/:empEntryId', async (req, res, next) => {
     const [education] = await pool.execute(
       `SELECT SLNO, EMP_ENTRY_ID, EMPCODE, EXAMNAME, EXAMGROUP, BOARD, CLAS,
               PASSYEAR, REMARKS, INSTITUTE, SUBJECT_NAME
-         FROM HR_EMPEXAMDET
+         FROM hr_empexamdet
         WHERE EMP_ENTRY_ID = ?
         ORDER BY SLNO`,
       [empEntryId]
@@ -393,7 +393,7 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
     await conn.beginTransaction();
 
     const [existing] = await conn.execute(
-      `SELECT EMP_ENTRY_ID FROM UP_EMP WHERE EMP_ENTRY_ID = ? FOR UPDATE`,
+      `SELECT EMP_ENTRY_ID FROM up_emp WHERE EMP_ENTRY_ID = ? FOR UPDATE`,
       [empEntryId]
     );
 
@@ -402,7 +402,7 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
     }
 
     const [batch] = await conn.execute(
-      `SELECT BATCH_NO FROM HR_BATCH_CONTROL WHERE BATCH_NO = ? LIMIT 1`,
+      `SELECT BATCH_NO FROM hr_batch_control WHERE BATCH_NO = ? LIMIT 1`,
       [batchNo]
     );
 
@@ -411,7 +411,7 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
     }
 
     const [duplicateIdentity] = await conn.execute(
-      `SELECT EMP_ENTRY_ID FROM UP_EMP
+      `SELECT EMP_ENTRY_ID FROM up_emp
         WHERE MERITLIST_ID = ? AND CLASS_ID = ? AND EMP_ENTRY_ID <> ? LIMIT 1`,
       [meritlistId, classId, empEntryId]
     );
@@ -422,7 +422,7 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
 
     if (ipi) {
       const [duplicateIpi] = await conn.execute(
-        `SELECT EMP_ENTRY_ID FROM UP_EMP WHERE IPI = ? AND EMP_ENTRY_ID <> ? LIMIT 1`,
+        `SELECT EMP_ENTRY_ID FROM up_emp WHERE IPI = ? AND EMP_ENTRY_ID <> ? LIMIT 1`,
         [ipi, empEntryId]
       );
 
@@ -437,7 +437,7 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
       : [req.admin.username, new Date()];
 
     await conn.execute(
-      `UPDATE UP_EMP
+      `UPDATE up_emp
           SET MERITLIST_ID = ?, CLASS_ID = ?, IPI = ?, batch_no = ?,
               APPROVAL_STATUS = ?, APPROVED_BY = ?, APPROVED_AT = ?,
               ${setColumns}, UPDATED_AT = NOW()
@@ -455,7 +455,7 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
     );
 
     await conn.execute(
-      `DELETE FROM HR_EMPEXAMDET WHERE EMP_ENTRY_ID = ?`,
+      `DELETE FROM hr_empexamdet WHERE EMP_ENTRY_ID = ?`,
       [empEntryId]
     );
 
@@ -465,7 +465,7 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
 
     for (const row of normalizedEducation) {
       await conn.execute(
-        `INSERT INTO HR_EMPEXAMDET
+        `INSERT INTO hr_empexamdet
          (EMP_ENTRY_ID, EMPCODE, EXAMNAME, EXAMGROUP, BOARD, CLAS,
           PASSYEAR, REMARKS, INSTITUTE, SUBJECT_NAME)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -510,7 +510,7 @@ router.patch('/employees/:empEntryId/approval', async (req, res, next) => {
 
   try {
     const [result] = await pool.execute(
-      `UPDATE UP_EMP
+      `UPDATE up_emp
           SET APPROVAL_STATUS = ?,
               APPROVED_BY = ?,
               APPROVED_AT = NOW(),
@@ -556,7 +556,7 @@ router.patch('/employees/:empEntryId/ipi', async (req, res, next) => {
 
     const [employees] = await conn.execute(
       `SELECT EMP_ENTRY_ID, MERITLIST_ID, CLASS_ID, IPI
-         FROM UP_EMP
+         FROM up_emp
         WHERE EMP_ENTRY_ID = ?
         FOR UPDATE`,
       [empEntryId]
@@ -571,7 +571,7 @@ router.patch('/employees/:empEntryId/ipi', async (req, res, next) => {
 
     const [duplicate] = await conn.execute(
       `SELECT EMP_ENTRY_ID
-         FROM UP_EMP
+         FROM up_emp
         WHERE IPI = ?
           AND EMP_ENTRY_ID <> ?
         LIMIT 1`,
@@ -586,7 +586,7 @@ router.patch('/employees/:empEntryId/ipi', async (req, res, next) => {
     }
 
     await conn.execute(
-      `UPDATE UP_EMP
+      `UPDATE up_emp
           SET IPI = ?,
               UPDATED_AT = NOW()
         WHERE EMP_ENTRY_ID = ?`,
@@ -594,14 +594,14 @@ router.patch('/employees/:empEntryId/ipi', async (req, res, next) => {
     );
 
     await conn.execute(
-      `UPDATE HR_EMPEXAMDET
+      `UPDATE hr_empexamdet
           SET EMPCODE = ?
         WHERE EMP_ENTRY_ID = ?`,
       [ipi, empEntryId]
     );
 
     await conn.execute(
-      `UPDATE HR_UPDATE_REQUEST
+      `UPDATE hr_update_request
           SET IPI = ?,
               UPDATED_AT = NOW()
         WHERE EMP_ENTRY_ID = ?`,
@@ -631,7 +631,7 @@ router.patch('/employees/:empEntryId/ipi', async (req, res, next) => {
 router.get('/update-requests', async (req, res, next) => {
   try {
     await pool.query(
-      `UPDATE HR_UPDATE_REQUEST
+      `UPDATE hr_update_request
           SET STATUS = 'EXPIRED'
         WHERE STATUS = 'APPROVED'
           AND APPROVED_UNTIL <= NOW()`
@@ -648,8 +648,8 @@ router.get('/update-requests', async (req, res, next) => {
 
     const [rows] = await pool.execute(
       `SELECT r.*, e.NAME, e.PHONE
-         FROM HR_UPDATE_REQUEST r
-         JOIN UP_EMP e
+         FROM hr_update_request r
+         JOIN up_emp e
            ON e.EMP_ENTRY_ID = r.EMP_ENTRY_ID
          ${where}
         ORDER BY r.REQUESTED_AT DESC`,
@@ -676,7 +676,7 @@ router.patch('/update-requests/:requestId', async (req, res, next) => {
   try {
     if (status === 'APPROVED') {
       await pool.execute(
-        `UPDATE HR_UPDATE_REQUEST
+        `UPDATE hr_update_request
             SET STATUS = 'APPROVED',
                 APPROVED_AT = NOW(),
                 APPROVED_UNTIL = DATE_ADD(NOW(), INTERVAL 24 HOUR),
@@ -689,7 +689,7 @@ router.patch('/update-requests/:requestId', async (req, res, next) => {
 
     } else {
       await pool.execute(
-        `UPDATE HR_UPDATE_REQUEST
+        `UPDATE hr_update_request
             SET STATUS = 'REJECTED',
                 APPROVED_AT = NULL,
                 APPROVED_UNTIL = NULL,
@@ -760,7 +760,7 @@ router.get('/export/:batchNo', async (req, res, next) => {
           GRNT_MOBILE,
           CREATED_AT,
           UPDATED_AT
-        FROM UP_EMP
+        FROM up_emp
        WHERE batch_no = ?
        ORDER BY MERITLIST_ID, CLASS_ID`,
       [batchNo]
@@ -778,8 +778,8 @@ router.get('/export/:batchNo', async (req, res, next) => {
           d.REMARKS,
           d.INSTITUTE,
           d.SUBJECT_NAME
-        FROM HR_EMPEXAMDET d
-        JOIN UP_EMP e
+        FROM hr_empexamdet d
+        JOIN up_emp e
           ON e.EMP_ENTRY_ID = d.EMP_ENTRY_ID
        WHERE e.batch_no = ?
        ORDER BY e.MERITLIST_ID, e.CLASS_ID, d.SLNO`,
@@ -787,8 +787,8 @@ router.get('/export/:batchNo', async (req, res, next) => {
     );
 
     const workbook = new ExcelJS.Workbook();
-    const empSheet = workbook.addWorksheet('UP_EMP');
-    const examSheet = workbook.addWorksheet('HR_EMPEXAMDET');
+    const empSheet = workbook.addWorksheet('up_emp');
+    const examSheet = workbook.addWorksheet('hr_empexamdet');
 
     if (employees.length) {
       empSheet.columns = Object.keys(employees[0]).map(k => ({

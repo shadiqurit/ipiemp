@@ -60,7 +60,7 @@ function validateEmployee(e) {
 async function getVerifiedEmployee(conn, meritlistId, classId, phone, lock = false) {
   const sql =
     `SELECT *
-       FROM UP_EMP
+       FROM up_emp
       WHERE MERITLIST_ID = ?
         AND CLASS_ID = ?
         AND REPLACE(PHONE, ' ', '') = ?
@@ -77,7 +77,7 @@ async function getVerifiedEmployee(conn, meritlistId, classId, phone, lock = fal
 async function getEmployeeByIdentity(conn, meritlistId, classId, lock = false) {
   const sql =
     `SELECT *
-       FROM UP_EMP
+       FROM up_emp
       WHERE MERITLIST_ID = ?
         AND CLASS_ID = ?
       LIMIT 1` + (lock ? ' FOR UPDATE' : '');
@@ -143,7 +143,7 @@ router.post('/employee/lookup', async (req, res, next) => {
       // but the phone was typed incorrectly.
       const [sameIdentity] = await conn.execute(
         `SELECT EMP_ENTRY_ID
-           FROM UP_EMP
+           FROM up_emp
           WHERE MERITLIST_ID = ?
             AND CLASS_ID = ?
           LIMIT 1`,
@@ -179,7 +179,7 @@ router.post('/employee/lookup', async (req, res, next) => {
     const [education] = await conn.execute(
       `SELECT SLNO, EMP_ENTRY_ID, EMPCODE, EXAMNAME, EXAMGROUP, BOARD, CLAS,
               PASSYEAR, REMARKS, INSTITUTE, SUBJECT_NAME
-         FROM HR_EMPEXAMDET
+         FROM hr_empexamdet
         WHERE EMP_ENTRY_ID = ?
         ORDER BY SLNO`,
       [employee.EMP_ENTRY_ID]
@@ -355,7 +355,7 @@ router.post('/employee/save', async (req, res, next) => {
       ];
 
       const [result] = await conn.execute(
-        `INSERT INTO UP_EMP
+        `INSERT INTO up_emp
          (${insertCols.join(',')}, CREATED_AT)
          VALUES (${insertCols.map(() => '?').join(',')}, NOW())`,
         values
@@ -387,7 +387,7 @@ router.post('/employee/save', async (req, res, next) => {
       const setSql = updateCols.map(c => `${c} = ?`).join(',');
 
       await conn.execute(
-        `UPDATE UP_EMP
+        `UPDATE up_emp
             SET ${setSql},
                 UPDATED_AT = NOW()
           WHERE EMP_ENTRY_ID = ?`,
@@ -398,7 +398,7 @@ router.post('/employee/save', async (req, res, next) => {
       );
 
       await conn.execute(
-        `DELETE FROM HR_EMPEXAMDET
+        `DELETE FROM hr_empexamdet
           WHERE EMP_ENTRY_ID = ?`,
         [current.EMP_ENTRY_ID]
       );
@@ -410,7 +410,7 @@ router.post('/employee/save', async (req, res, next) => {
 
     for (const row of normalizedEducation) {
       await conn.execute(
-        `INSERT INTO HR_EMPEXAMDET
+        `INSERT INTO hr_empexamdet
          (EMP_ENTRY_ID, EMPCODE, EXAMNAME, EXAMGROUP, BOARD, CLAS,
           PASSYEAR, REMARKS, INSTITUTE, SUBJECT_NAME)
          VALUES (?,?,?,?,?,?,?,?,?,?)`,
@@ -511,7 +511,7 @@ router.post('/employee/update-request', async (req, res, next) => {
     }
 
     await conn.execute(
-      `INSERT INTO HR_UPDATE_REQUEST
+      `INSERT INTO hr_update_request
        (REQUEST_ID, EMP_ENTRY_ID, IPI, MERITLIST_ID, CLASS_ID,
         BATCH_NO, REQUEST_NOTE, STATUS, REQUESTED_AT)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW())`,

@@ -9,6 +9,7 @@ backend/node_modules/
 !.env.example
 frontend/.env
 backend/.env
+backend/ca.pem
 
 # Vue / Vite build
 frontend/dist/

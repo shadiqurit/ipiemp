@@ -1,7 +1,12 @@
 import mysql from 'mysql2/promise';
+import fs from 'node:fs';
 import 'dotenv/config';
 
-const sslCa = String(process.env.DB_SSL_CA || '').replace(/\\n/g, '\n') || undefined;
+const sslCaFromEnvironment = String(process.env.DB_SSL_CA || '').replace(/\\n/g, '\n');
+const sslCaPath = String(process.env.DB_SSL_CA_PATH || '').trim();
+const sslCa = sslCaFromEnvironment || (sslCaPath
+  ? fs.readFileSync(sslCaPath, 'utf8')
+  : undefined);
 
 const ssl = String(process.env.DB_SSL).toLowerCase() === 'true'
   ? {

@@ -1,13 +1,13 @@
 export async function getActiveBatch(conn) {
   const [rows] = await conn.query(
     `SELECT BATCH_NO, STATUS, STARTED_AT
-       FROM HR_BATCH_CONTROL
+       FROM hr_batch_control
       WHERE STATUS = 'ACTIVE'
       ORDER BY STARTED_AT DESC, UPDATED_AT DESC`
   );
 
   if (rows.length > 1) {
-    const err = new Error('More than one ACTIVE batch exists. Fix HR_BATCH_CONTROL.');
+    const err = new Error('More than one ACTIVE batch exists. Fix hr_batch_control.');
     err.status = 409;
     throw err;
   }
@@ -32,7 +32,7 @@ export async function getEmployeePermission(
 
   const [batchRows] = await conn.execute(
     `SELECT STATUS
-       FROM HR_BATCH_CONTROL
+       FROM hr_batch_control
       WHERE BATCH_NO = ?`,
     [batchNo]
   );
@@ -48,7 +48,7 @@ export async function getEmployeePermission(
 
   const [approved] = await conn.execute(
     `SELECT REQUEST_ID, APPROVED_UNTIL
-       FROM HR_UPDATE_REQUEST
+       FROM hr_update_request
       WHERE EMP_ENTRY_ID = ?
         AND STATUS = 'APPROVED'
         AND APPROVED_UNTIL > NOW()
@@ -68,7 +68,7 @@ export async function getEmployeePermission(
 
   const [pending] = await conn.execute(
     `SELECT REQUEST_ID
-       FROM HR_UPDATE_REQUEST
+       FROM hr_update_request
       WHERE EMP_ENTRY_ID = ?
         AND STATUS = 'PENDING'
       ORDER BY REQUESTED_AT DESC
