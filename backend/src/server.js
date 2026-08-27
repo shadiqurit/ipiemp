@@ -43,6 +43,13 @@ app.use((err, req, res, next) => {
 });
 
 const port = Number(process.env.PORT || 3000);
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Employee Portal API listening on port ${port}`);
-});
+
+// Vercel loads the Express app as a serverless function. Locally, this file
+// continues to start the HTTP server with `npm run dev` or `npm start`.
+if (!process.env.VERCEL) {
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Employee Portal API listening on port ${port}`);
+  });
+}
+
+export default app;

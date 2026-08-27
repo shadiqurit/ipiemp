@@ -144,6 +144,58 @@ Merit List ID
 + OTP
 ```
 
+## Run locally
+
+Install dependencies once:
+
+```bash
+cd backend && npm install
+cd ../frontend && npm install
+```
+
+Create `backend/.env` from `backend/.env.example` and configure either your
+local MySQL server or your Aiven MySQL credentials. For Aiven, set `DB_SSL=true`.
+
+Start the API in one terminal:
+
+```bash
+cd backend
+npm run dev
+```
+
+Start the frontend in a second terminal:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Open the URL printed by Vite (normally `http://localhost:5173`). The Vite dev
+server proxies `/api` requests to `http://localhost:3000`, so no frontend API
+environment variable is required for local development.
+
+## Deploy to Vercel with Aiven MySQL
+
+Deploy two Vercel projects from this repository:
+
+| Project | Root directory | Required production variables |
+| --- | --- | --- |
+| API | `backend` | `NODE_ENV=production`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME=employee_portal`, `DB_SSL=true`, `JWT_SECRET`, `FRONTEND_ORIGIN=https://YOUR-FRONTEND.vercel.app` |
+| Web | `frontend` | `VITE_API_URL=https://YOUR-BACKEND.vercel.app/api` |
+
+Redeploy each project whenever its environment variables change. Do not use
+`localhost` in a Vercel environment variable. `FRONTEND_ORIGIN` must be the
+exact frontend origin, with no trailing slash.
+
+To create the initial admin against the production database, download the API
+project's Vercel Production variables locally, run the command below from
+`backend`, then remove the downloaded `.env` file:
+
+```bash
+npx vercel env pull .env --environment=production
+npm run admin:create -- admin "use-a-strong-password" "Administrator"
+```
+
 ## Migration note
 
 This V5 schema differs from the earlier version.
