@@ -185,7 +185,8 @@ Deploy two Vercel projects from this repository:
 
 Redeploy each project whenever its environment variables change. Do not use
 `localhost` in a Vercel environment variable. `FRONTEND_ORIGIN` must be the
-exact frontend origin, with no trailing slash.
+exact frontend origin. A trailing slash is accepted, but this is the preferred
+form: `https://YOUR-FRONTEND.vercel.app`.
 
 To create the initial admin against the production database, download the API
 project's Vercel Production variables locally, run the command below from

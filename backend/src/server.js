@@ -12,14 +12,26 @@ app.set('trust proxy', 1);
 app.use(helmet());
 app.use(express.json({ limit: '1mb' }));
 
+function normalizeOrigin(value) {
+  const trimmed = String(value || '').trim();
+
+  if (!trimmed) return '';
+
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed.replace(/\/+$/, '');
+  }
+}
+
 const origins = String(process.env.FRONTEND_ORIGIN || '')
   .split(',')
-  .map(x => x.trim())
+  .map(normalizeOrigin)
   .filter(Boolean);
 
 app.use(cors({
   origin(origin, cb) {
-    if (!origin || !origins.length || origins.includes(origin)) return cb(null, true);
+    if (!origin || !origins.length || origins.includes(normalizeOrigin(origin))) return cb(null, true);
     cb(new Error('Origin not allowed by CORS.'));
   }
 }));
