@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { formatDate } from '../utils/dates';
+import { t } from '../i18n';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -27,5 +28,5 @@ function update(event) {
 </script>
 
 <template>
-  <input :value="displayValue" type="text" placeholder="DD-MON-YYYY" :disabled="disabled" :required="required" @input="update" />
+  <input :value="displayValue" type="text" :placeholder="t('DD-MON-YYYY')" :disabled="disabled" :required="required" @input="update" />
 </template>

@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import { t } from '../i18n';
 
 const props = defineProps({
   modelValue: { type: [String, Number], default: '' },
@@ -33,7 +34,7 @@ function update(event) {
   <input
     :value="displayValue"
     :list="listId"
-    :placeholder="placeholder"
+    :placeholder="t(placeholder)"
     :disabled="disabled"
     :required="required"
     autocomplete="off"
@@ -41,7 +42,7 @@ function update(event) {
     @change="update"
   />
   <datalist :id="listId">
-    <option value="" label="Select" />
+    <option value="" :label="t('Select')" />
     <option v-for="option in normalizedOptions" :key="option.value" :value="option.label" />
   </datalist>
 </template>

@@ -4,6 +4,7 @@ import { api, setAdminToken } from '../api';
 import AutoCompleteSelect from '../components/AutoCompleteSelect.vue';
 import DateInput from '../components/DateInput.vue';
 import { formatDateTime } from '../utils/dates';
+import { t } from '../i18n';
 
 const token = ref(localStorage.getItem('admin_token') || '');
 const username = ref('');
@@ -266,8 +267,8 @@ onMounted(refresh);
   <main class="page">
     <section class="hero">
       <div>
-        <span class="badge">ADMIN</span>
-        <h1>Employee Portal Admin</h1>
+        <span class="badge">{{ t('Admin') }}</span>
+        <h1>{{ t('Employee Portal Admin') }}</h1>
         <p v-if="token">Manage administrator access, employees and update requests.</p>
       </div>
     </section>
@@ -275,32 +276,32 @@ onMounted(refresh);
     <div v-if="message" class="notice">{{ message }}</div>
 
     <section v-if="!token" class="card auth">
-      <h2>Admin Login</h2>
-      <label>Username</label><input v-model="username" autocomplete="username" />
-      <label>Password</label><input v-model="password" type="password" autocomplete="current-password" @keyup.enter="login" />
-      <button class="primary" @click="login">Login</button>
+      <h2>{{ t('Admin Login') }}</h2>
+      <label>{{ t('Username') }}</label><input v-model="username" autocomplete="username" />
+      <label>{{ t('Password') }}</label><input v-model="password" type="password" autocomplete="current-password" @keyup.enter="login" />
+      <button class="primary" @click="login">{{ t('Login') }}</button>
     </section>
 
     <template v-else>
       <section class="toolbar">
-        <router-link to="/">Public Form</router-link>
-        <button @click="refresh">Refresh</button>
-        <button @click="logout">Logout</button>
+        <router-link to="/">{{ t('Public Form') }}</router-link>
+        <button @click="refresh">{{ t('Refresh') }}</button>
+        <button @click="logout">{{ t('Logout') }}</button>
       </section>
 
       <nav class="admin-menu" aria-label="Admin menu">
-        <button :class="{ active: activeSection === 'users' }" @click="activeSection = 'users'">User List</button>
-        <button :class="{ active: activeSection === 'batches' }" @click="activeSection = 'batches'">Batch Control</button>
-        <button :class="{ active: activeSection === 'employees' }" @click="activeSection = 'employees'">Employee List</button>
-        <button :class="{ active: activeSection === 'requests' }" @click="activeSection = 'requests'">Update Requests</button>
+        <button :class="{ active: activeSection === 'users' }" @click="activeSection = 'users'">{{ t('User List') }}</button>
+        <button :class="{ active: activeSection === 'batches' }" @click="activeSection = 'batches'">{{ t('Batch Control') }}</button>
+        <button :class="{ active: activeSection === 'employees' }" @click="activeSection = 'employees'">{{ t('Employee List') }}</button>
+        <button :class="{ active: activeSection === 'requests' }" @click="activeSection = 'requests'">{{ t('Update Requests') }}</button>
       </nav>
 
       <section v-if="activeSection === 'users'" class="card">
-        <div class="section-title"><div><h2>User List</h2><span>{{ users.length }} administrator(s)</span></div><button class="primary" @click="openUserModal">Create User</button></div>
+        <div class="section-title"><div><h2>{{ t('User List') }}</h2><span>{{ users.length }} administrator(s)</span></div><button class="primary" @click="openUserModal">{{ t('Create User') }}</button></div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Username</th><th>Display Name</th><th>Status</th><th>Created</th><th>Action</th></tr></thead>
+          <thead><tr><th>{{ t('Username') }}</th><th>{{ t('Display Name') }}</th><th>{{ t('Status') }}</th><th>{{ t('Created') }}</th><th>{{ t('Action') }}</th></tr></thead>
           <tbody>
-            <tr v-for="user in users" :key="user.USER_ID"><td>{{ user.USERNAME }}</td><td>{{ user.DISPLAY_NAME }}</td><td>{{ user.ACTIVE_YN === 'Y' ? 'Active' : 'Inactive' }}</td><td>{{ formatDateTime(user.CREATED_AT) }}</td><td><button @click="openPasswordModal(user)">Update Password</button></td></tr>
+            <tr v-for="user in users" :key="user.USER_ID"><td>{{ user.USERNAME }}</td><td>{{ user.DISPLAY_NAME }}</td><td>{{ t(user.ACTIVE_YN === 'Y' ? 'Active' : 'Inactive') }}</td><td>{{ formatDateTime(user.CREATED_AT) }}</td><td><button @click="openPasswordModal(user)">{{ t('Update Password') }}</button></td></tr>
             <tr v-if="!users.length"><td colspan="5">No administrators found.</td></tr>
           </tbody>
         </table></div>
@@ -308,43 +309,43 @@ onMounted(refresh);
 
       <div v-if="userModalOpen" class="modal-backdrop" @click.self="userModalOpen = false">
         <section class="card modal" role="dialog" aria-modal="true" aria-labelledby="create-user-title">
-          <div class="section-title"><h2 id="create-user-title">Create Admin User</h2><button type="button" @click="userModalOpen = false">Close</button></div>
+          <div class="section-title"><h2 id="create-user-title">{{ t('Create Admin User') }}</h2><button type="button" @click="userModalOpen = false">{{ t('Close') }}</button></div>
           <p class="muted">Usernames can contain letters, numbers, dot, dash and underscore. Passwords need at least 8 characters.</p>
-          <label>Username</label><input v-model="newUser.username" autocomplete="username" />
-          <label>Display Name</label><input v-model="newUser.displayName" autocomplete="name" />
-          <label>Password</label><input v-model="newUser.password" type="password" autocomplete="new-password" @keyup.enter="createUser" />
-          <div class="modal-actions"><button type="button" @click="userModalOpen = false">Cancel</button><button class="primary" @click="createUser">Create User</button></div>
+          <label>{{ t('Username') }}</label><input v-model="newUser.username" autocomplete="username" />
+          <label>{{ t('Display Name') }}</label><input v-model="newUser.displayName" autocomplete="name" />
+          <label>{{ t('Password') }}</label><input v-model="newUser.password" type="password" autocomplete="new-password" @keyup.enter="createUser" />
+          <div class="modal-actions"><button type="button" @click="userModalOpen = false">{{ t('Cancel') }}</button><button class="primary" @click="createUser">{{ t('Create User') }}</button></div>
         </section>
       </div>
 
       <div v-if="passwordModalOpen" class="modal-backdrop" @click.self="passwordModalOpen = false">
         <section class="card modal" role="dialog" aria-modal="true" aria-labelledby="update-password-title">
-          <div class="section-title"><h2 id="update-password-title">Update Password</h2><button type="button" @click="passwordModalOpen = false">Close</button></div>
+          <div class="section-title"><h2 id="update-password-title">{{ t('Update Password') }}</h2><button type="button" @click="passwordModalOpen = false">{{ t('Close') }}</button></div>
           <p class="muted">Set a new password for <b>{{ selectedUser?.USERNAME }}</b>. It must have at least 8 characters.</p>
-          <label>New Password</label><input v-model="replacementPassword" type="password" autocomplete="new-password" @keyup.enter="updateUserPassword" />
-          <div class="modal-actions"><button type="button" @click="passwordModalOpen = false">Cancel</button><button class="primary" @click="updateUserPassword">Update Password</button></div>
+          <label>{{ t('New Password') }}</label><input v-model="replacementPassword" type="password" autocomplete="new-password" @keyup.enter="updateUserPassword" />
+          <div class="modal-actions"><button type="button" @click="passwordModalOpen = false">{{ t('Cancel') }}</button><button class="primary" @click="updateUserPassword">{{ t('Update Password') }}</button></div>
         </section>
       </div>
 
       <section v-if="activeSection === 'batches'" class="card">
-        <h2>Batch Control</h2>
+        <h2>{{ t('Batch Control') }}</h2>
         <p class="muted">Activate a batch to accept new employee entries and let approved employees update their data without an admin request.</p>
-        <div class="inline"><input v-model="newBatch" placeholder="BATCH-2026-01" /><button @click="addBatch">Create Batch</button></div>
+        <div class="inline"><input v-model="newBatch" placeholder="BATCH-2026-01" /><button @click="addBatch">{{ t('Create Batch') }}</button></div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Batch</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>{{ t('Batch') }}</th><th>{{ t('Status') }}</th><th>{{ t('Actions') }}</th></tr></thead>
           <tbody>
-            <tr v-for="batch in batches" :key="batch.BATCH_NO"><td>{{ batch.BATCH_NO }}</td><td>{{ batch.STATUS }}</td><td class="actions-cell"><button v-if="batch.STATUS !== 'ACTIVE'" @click="setBatch(batch.BATCH_NO, 'ACTIVE')">Activate</button><button v-else @click="setBatch(batch.BATCH_NO, 'INACTIVE')">Deactivate</button><button @click="exportBatch(batch.BATCH_NO)">Excel</button></td></tr>
+            <tr v-for="batch in batches" :key="batch.BATCH_NO"><td>{{ batch.BATCH_NO }}</td><td>{{ t(batch.STATUS) }}</td><td class="actions-cell"><button v-if="batch.STATUS !== 'ACTIVE'" @click="setBatch(batch.BATCH_NO, 'ACTIVE')">{{ t('Activate') }}</button><button v-else @click="setBatch(batch.BATCH_NO, 'INACTIVE')">{{ t('Deactivate') }}</button><button @click="exportBatch(batch.BATCH_NO)">{{ t('Excel') }}</button></td></tr>
             <tr v-if="!batches.length"><td colspan="3">No batches found.</td></tr>
           </tbody>
         </table></div>
       </section>
 
       <section v-if="activeSection === 'employees'" class="card">
-          <div class="section-title"><div><h2>Employee List</h2><p class="muted">New submissions must be approved before an employee can update their data.</p></div><div class="employee-filters"><input v-model="employeeSearch" placeholder="Search name, ID, IPI or phone" @keyup.enter="refresh" /><AutoCompleteSelect v-model="employeeBatchFilter" :options="batchFilterOptions" placeholder="Search batch" /><button @click="refresh">Search</button></div></div>
+          <div class="section-title"><div><h2>{{ t('Employee List') }}</h2><p class="muted">New submissions must be approved before an employee can update their data.</p></div><div class="employee-filters"><input v-model="employeeSearch" placeholder="Search name, ID, IPI or phone" @keyup.enter="refresh" /><AutoCompleteSelect v-model="employeeBatchFilter" :options="batchFilterOptions" :placeholder="t('Search batch')" /><button @click="refresh">{{ t('Search') }}</button></div></div>
           <div class="table-wrap"><table>
-            <thead><tr><th>Merit List ID</th><th>Class ID</th><th>Name</th><th>Phone</th><th>Batch</th><th>Approval</th><th>IPI</th><th>Actions</th></tr></thead>
+            <thead><tr><th>{{ t('Merit List ID') }}</th><th>{{ t('Class ID') }}</th><th>{{ t('Name') }}</th><th>{{ t('Phone') }}</th><th>{{ t('Batch') }}</th><th>{{ t('Approval Status') }}</th><th>{{ t('IPI') }}</th><th>{{ t('Actions') }}</th></tr></thead>
             <tbody>
-              <tr v-for="employee in employees" :key="employee.EMP_ENTRY_ID"><td>{{ employee.MERITLIST_ID }}</td><td>{{ employee.CLASS_ID }}</td><td>{{ employee.NAME }}</td><td>{{ employee.PHONE }}</td><td>{{ employee.batch_no }}</td><td>{{ employee.APPROVAL_STATUS }}</td><td>{{ employee.IPI || 'Not assigned' }}</td><td class="actions-cell"><router-link class="button-link" :to="{ name: 'admin-employee-edit', params: { empEntryId: employee.EMP_ENTRY_ID } }">Edit Details</router-link><button v-if="employee.APPROVAL_STATUS !== 'APPROVED'" class="primary" @click="approveEmployee(employee, 'APPROVED')">Approve</button><button v-if="employee.APPROVAL_STATUS === 'PENDING'" class="danger" @click="approveEmployee(employee, 'REJECTED')">Reject</button><button @click="assignIpi(employee)">{{ employee.IPI ? 'Change IPI' : 'Assign IPI' }}</button></td></tr>
+              <tr v-for="employee in employees" :key="employee.EMP_ENTRY_ID"><td>{{ employee.MERITLIST_ID }}</td><td>{{ employee.CLASS_ID }}</td><td>{{ employee.NAME }}</td><td>{{ employee.PHONE }}</td><td>{{ employee.batch_no }}</td><td>{{ t(employee.APPROVAL_STATUS === 'PENDING' ? 'Pending' : employee.APPROVAL_STATUS === 'APPROVED' ? 'Approved' : 'Rejected') }}</td><td>{{ employee.IPI || t('Not assigned') }}</td><td class="actions-cell"><router-link class="button-link" :to="{ name: 'admin-employee-edit', params: { empEntryId: employee.EMP_ENTRY_ID } }">{{ t('Edit Details') }}</router-link><button v-if="employee.APPROVAL_STATUS !== 'APPROVED'" class="primary" @click="approveEmployee(employee, 'APPROVED')">{{ t('Approve') }}</button><button v-if="employee.APPROVAL_STATUS === 'PENDING'" class="danger" @click="approveEmployee(employee, 'REJECTED')">{{ t('Reject') }}</button><button @click="assignIpi(employee)">{{ t(employee.IPI ? 'Change IPI' : 'Assign IPI') }}</button></td></tr>
               <tr v-if="!employees.length"><td colspan="8">No employees found.</td></tr>
             </tbody>
           </table></div>
@@ -352,113 +353,113 @@ onMounted(refresh);
 
       <form v-if="activeSection === 'employees' && selectedEmployeeId" class="form" @submit.prevent="saveEmployeeDetails">
         <section class="card">
-          <div class="section-title"><div><h2>Employee Identity</h2><p class="muted">Administrators can edit identity values, assign IPI, move the employee to another batch, and change approval status.</p></div><button type="button" @click="closeEmployeeEditor">Close</button></div>
+          <div class="section-title"><div><h2>{{ t('Employee Identity') }}</h2><p class="muted">Administrators can edit identity values, assign IPI, move the employee to another batch, and change approval status.</p></div><button type="button" @click="closeEmployeeEditor">{{ t('Close') }}</button></div>
           <div class="grid">
-            <div class="field"><label>Merit List ID</label><input v-model="editEmployee.MERITLIST_ID" required /></div>
-            <div class="field"><label>Class ID</label><input v-model="editEmployee.CLASS_ID" required /></div>
-            <div class="field"><label>IPI</label><input v-model="editEmployee.IPI" placeholder="Optional" /></div>
-            <div class="field"><label>Batch</label><select v-model="editBatch" required><option v-for="batch in batches" :key="batch.BATCH_NO" :value="batch.BATCH_NO">{{ batch.BATCH_NO }} ({{ batch.STATUS }})</option></select></div>
-            <div class="field"><label>Approval Status</label><select v-model="editApprovalStatus"><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select></div>
+            <div class="field"><label>{{ t('Merit List ID') }}</label><input v-model="editEmployee.MERITLIST_ID" required /></div>
+            <div class="field"><label>{{ t('Class ID') }}</label><input v-model="editEmployee.CLASS_ID" required /></div>
+            <div class="field"><label>{{ t('IPI') }}</label><input v-model="editEmployee.IPI" :placeholder="t('Optional')" /></div>
+            <div class="field"><label>{{ t('Batch') }}</label><select v-model="editBatch" required><option v-for="batch in batches" :key="batch.BATCH_NO" :value="batch.BATCH_NO">{{ batch.BATCH_NO }} ({{ t(batch.STATUS) }})</option></select></div>
+            <div class="field"><label>{{ t('Approval Status') }}</label><select v-model="editApprovalStatus"><option value="PENDING">{{ t('Pending') }}</option><option value="APPROVED">{{ t('Approved') }}</option><option value="REJECTED">{{ t('Rejected') }}</option></select></div>
           </div>
         </section>
 
         <section class="card">
-          <h2>Basic Information</h2>
+          <h2>{{ t('Basic Information') }}</h2>
           <div class="grid">
-            <div class="field"><label>Employee Name</label><input v-model="editEmployee.NAME" /></div>
-            <div class="field"><label>Birth Date</label><DateInput v-model="editEmployee.BIRTHDATE" /></div>
-            <div class="field"><label>Blood Group</label><input v-model="editEmployee.BLD_GROUP" /></div>
-            <div class="field"><label>Nationality</label><input v-model="editEmployee.NATIONALITY" /></div>
-            <div class="field"><label>Height</label><input v-model="editEmployee.HEIGHT" /></div>
-            <div class="field"><label>Weight</label><input v-model="editEmployee.WEIGHT" /></div>
-            <div class="field"><label>Gender</label><select v-model="editEmployee.GENDER"><option value="">Select</option><option value="M">Male</option><option value="F">Female</option></select></div>
-            <div class="field"><label>Religion</label><select v-model="editEmployee.RELIGION"><option value="">Select</option><option value="I">Islam</option><option value="H">Hindu</option><option value="B">Buddha</option><option value="C">Christian</option></select></div>
-            <div class="field"><label>Marital Status</label><select v-model="editEmployee.MARITAL_STATUS"><option value="">Select</option><option value="U">Unmarried</option><option value="M">Married</option></select></div>
+            <div class="field"><label>{{ t('Employee Name') }}</label><input v-model="editEmployee.NAME" /></div>
+            <div class="field"><label>{{ t('Birth Date') }}</label><DateInput v-model="editEmployee.BIRTHDATE" /></div>
+            <div class="field"><label>{{ t('Blood Group') }}</label><input v-model="editEmployee.BLD_GROUP" /></div>
+            <div class="field"><label>{{ t('Nationality') }}</label><input v-model="editEmployee.NATIONALITY" /></div>
+            <div class="field"><label>{{ t('Height') }}</label><input v-model="editEmployee.HEIGHT" /></div>
+            <div class="field"><label>{{ t('Weight') }}</label><input v-model="editEmployee.WEIGHT" /></div>
+            <div class="field"><label>{{ t('Gender') }}</label><select v-model="editEmployee.GENDER"><option value="">Select</option><option value="M">{{ t('Male') }}</option><option value="F">{{ t('Female') }}</option></select></div>
+            <div class="field"><label>{{ t('Religion') }}</label><select v-model="editEmployee.RELIGION"><option value="">Select</option><option value="I">{{ t('Islam') }}</option><option value="H">{{ t('Hindu') }}</option><option value="B">{{ t('Buddha') }}</option><option value="C">{{ t('Christian') }}</option></select></div>
+            <div class="field"><label>{{ t('Marital Status') }}</label><select v-model="editEmployee.MARITAL_STATUS"><option value="">Select</option><option value="U">{{ t('Unmarried') }}</option><option value="M">{{ t('Married') }}</option></select></div>
           </div>
         </section>
 
         <section class="card">
-          <h2>Contact &amp; Identity</h2>
+          <h2>{{ t('Contact & Identity') }}</h2>
           <div class="grid">
-            <div class="field"><label>Email</label><input v-model="editEmployee.EMAIL" type="email" /></div>
-            <div class="field"><label>Primary Phone</label><input v-model="editEmployee.PHONE" /></div>
-            <div class="field"><label>Alternate Phone</label><input v-model="editEmployee.PHONE1" /></div>
-            <div class="field"><label>NID</label><input v-model="editEmployee.NID" /></div>
+            <div class="field"><label>{{ t('Email') }}</label><input v-model="editEmployee.EMAIL" type="email" /></div>
+            <div class="field"><label>{{ t('Primary Phone') }}</label><input v-model="editEmployee.PHONE" /></div>
+            <div class="field"><label>{{ t('Alternate Phone') }}</label><input v-model="editEmployee.PHONE1" /></div>
+            <div class="field"><label>{{ t('NID') }}</label><input v-model="editEmployee.NID" /></div>
           </div>
         </section>
 
         <section class="card">
-          <h2>Address Information</h2>
+          <h2>{{ t('Address Information') }}</h2>
           <div class="address-grid">
             <div class="address-box">
-              <h3>Permanent Address</h3>
-              <label>Village / House / Road</label><input v-model="editEmployee.PERMANENT_VILLAGE" />
-              <label>Post Office</label><input v-model="editEmployee.PERMANENT_POST" />
-              <label>Thana / Upazila</label><input v-model="editEmployee.PERMANENT_THANA" />
-              <label>District</label><input v-model="editEmployee.PERMANENT_DISTRICT" />
+              <h3>{{ t('Permanent Address') }}</h3>
+              <label>{{ t('Village / House / Road') }}</label><input v-model="editEmployee.PERMANENT_VILLAGE" />
+              <label>{{ t('Post Office') }}</label><input v-model="editEmployee.PERMANENT_POST" />
+              <label>{{ t('Thana / Upazila') }}</label><input v-model="editEmployee.PERMANENT_THANA" />
+              <label>{{ t('District') }}</label><input v-model="editEmployee.PERMANENT_DISTRICT" />
             </div>
             <div class="address-box">
-              <h3>Present Address</h3>
-              <label>Village / House / Road</label><input v-model="editEmployee.PRESENT_VILLAGE" />
-              <label>Post Office</label><input v-model="editEmployee.PRESENT_POST" />
-              <label>Thana / Upazila</label><input v-model="editEmployee.PRESENT_THANA" />
-              <label>District</label><input v-model="editEmployee.PRESENT_DISTRICT" />
+              <h3>{{ t('Present Address') }}</h3>
+              <label>{{ t('Village / House / Road') }}</label><input v-model="editEmployee.PRESENT_VILLAGE" />
+              <label>{{ t('Post Office') }}</label><input v-model="editEmployee.PRESENT_POST" />
+              <label>{{ t('Thana / Upazila') }}</label><input v-model="editEmployee.PRESENT_THANA" />
+              <label>{{ t('District') }}</label><input v-model="editEmployee.PRESENT_DISTRICT" />
             </div>
           </div>
         </section>
 
         <section class="card">
-          <h2>Emergency Contact</h2>
+          <h2>{{ t('Emergency Contact') }}</h2>
           <div class="grid">
-            <div class="field"><label>Emergency Person</label><input v-model="editEmployee.EMGRCNY_PERSON" /></div>
-            <div class="field"><label>Relationship</label><input v-model="editEmployee.EMGRCNY_RELATION" /></div>
-            <div class="field"><label>Emergency Phone</label><input v-model="editEmployee.EMGRCNY_PHONE" /></div>
-            <div class="field"><label>Emergency Address</label><input v-model="editEmployee.EMGRCNY_ADDRESS" /></div>
+            <div class="field"><label>{{ t('Emergency Person') }}</label><input v-model="editEmployee.EMGRCNY_PERSON" /></div>
+            <div class="field"><label>{{ t('Relationship') }}</label><input v-model="editEmployee.EMGRCNY_RELATION" /></div>
+            <div class="field"><label>{{ t('Emergency Phone') }}</label><input v-model="editEmployee.EMGRCNY_PHONE" /></div>
+            <div class="field"><label>{{ t('Emergency Address') }}</label><input v-model="editEmployee.EMGRCNY_ADDRESS" /></div>
           </div>
         </section>
 
         <section class="card">
-          <h2>Family &amp; Spouse</h2>
+          <h2>{{ t('Family & Spouse') }}</h2>
           <div class="grid">
-            <div class="field"><label>Father Name</label><input v-model="editEmployee.FATHER_NAME" /></div>
-            <div class="field"><label>Father Phone</label><input v-model="editEmployee.FATHER_PHONE" /></div>
-            <div class="field"><label>Mother Name</label><input v-model="editEmployee.MOTHER_NAME" /></div>
-            <div class="field"><label>Mother Phone</label><input v-model="editEmployee.MOTHER_PHONE" /></div>
-            <div class="field"><label>Spouse Name</label><input v-model="editEmployee.SPOUSE_NAME" /></div>
-            <div class="field"><label>Marriage Date</label><DateInput v-model="editEmployee.SPOSE_MARRIAGE_DATE" /></div>
-            <div class="field"><label>Spouse Occupation</label><input v-model="editEmployee.SPOSE_OCCUPATION" /></div>
-            <div class="field"><label>Spouse Phone</label><input v-model="editEmployee.SPOUSE_PHONE" /></div>
+            <div class="field"><label>{{ t('Father Name') }}</label><input v-model="editEmployee.FATHER_NAME" /></div>
+            <div class="field"><label>{{ t('Father Phone') }}</label><input v-model="editEmployee.FATHER_PHONE" /></div>
+            <div class="field"><label>{{ t('Mother Name') }}</label><input v-model="editEmployee.MOTHER_NAME" /></div>
+            <div class="field"><label>{{ t('Mother Phone') }}</label><input v-model="editEmployee.MOTHER_PHONE" /></div>
+            <div class="field"><label>{{ t('Spouse Name') }}</label><input v-model="editEmployee.SPOUSE_NAME" /></div>
+            <div class="field"><label>{{ t('Marriage Date') }}</label><DateInput v-model="editEmployee.SPOSE_MARRIAGE_DATE" /></div>
+            <div class="field"><label>{{ t('Spouse Occupation') }}</label><input v-model="editEmployee.SPOSE_OCCUPATION" /></div>
+            <div class="field"><label>{{ t('Spouse Phone') }}</label><input v-model="editEmployee.SPOUSE_PHONE" /></div>
           </div>
         </section>
 
         <section class="card">
-          <h2>Guarantor Information</h2>
+          <h2>{{ t('Guarantor Information') }}</h2>
           <div class="grid">
-            <div class="field"><label>Guarantor Name</label><input v-model="editEmployee.GRNT_NAME" /></div>
-            <div class="field"><label>Relationship</label><input v-model="editEmployee.GRNT_RELE" /></div>
-            <div class="field"><label>Guarantor Father</label><input v-model="editEmployee.GRNT_FATHER" /></div>
-            <div class="field"><label>Present Address</label><input v-model="editEmployee.GRNT_PRESENT_ADD" /></div>
-            <div class="field"><label>Permanent Address</label><input v-model="editEmployee.GRNT_PERMANET_ADD" /></div>
-            <div class="field"><label>Nationality</label><input v-model="editEmployee.GRNT_NATIONALITY" /></div>
-            <div class="field"><label>Profession</label><input v-model="editEmployee.GRNT_PROFFESSION" /></div>
-            <div class="field"><label>NID</label><input v-model="editEmployee.GRNT_NID" /></div>
-            <div class="field"><label>Mobile</label><input v-model="editEmployee.GRNT_MOBILE" /></div>
+            <div class="field"><label>{{ t('Guarantor Name') }}</label><input v-model="editEmployee.GRNT_NAME" /></div>
+            <div class="field"><label>{{ t('Relationship') }}</label><input v-model="editEmployee.GRNT_RELE" /></div>
+            <div class="field"><label>{{ t('Guarantor Father') }}</label><input v-model="editEmployee.GRNT_FATHER" /></div>
+            <div class="field"><label>{{ t('Present Address') }}</label><input v-model="editEmployee.GRNT_PRESENT_ADD" /></div>
+            <div class="field"><label>{{ t('Permanent Address') }}</label><input v-model="editEmployee.GRNT_PERMANET_ADD" /></div>
+            <div class="field"><label>{{ t('Nationality') }}</label><input v-model="editEmployee.GRNT_NATIONALITY" /></div>
+            <div class="field"><label>{{ t('Profession') }}</label><input v-model="editEmployee.GRNT_PROFFESSION" /></div>
+            <div class="field"><label>{{ t('NID') }}</label><input v-model="editEmployee.GRNT_NID" /></div>
+            <div class="field"><label>{{ t('Mobile') }}</label><input v-model="editEmployee.GRNT_MOBILE" /></div>
           </div>
         </section>
 
         <section class="card">
-          <div class="section-title"><h2>Education</h2><button type="button" @click="editEducation.push(blankEducation())">+ Add Education</button></div>
+          <div class="section-title"><h2>{{ t('Education') }}</h2><button type="button" @click="editEducation.push(blankEducation())">{{ t('+ Add Education') }}</button></div>
           <div v-for="(education, index) in editEducation" :key="index" class="edu">
-            <div class="section-title"><b>Education #{{ index + 1 }}</b><button v-if="editEducation.length > 1" type="button" class="danger" @click="editEducation.splice(index, 1)">Remove</button></div>
-            <div class="grid"><div v-for="[key, label] in educationFields" :key="key" class="field"><label>{{ label }}</label><input v-model="education[key]" /></div></div>
+            <div class="section-title"><b>{{ t('Education') }} #{{ index + 1 }}</b><button v-if="editEducation.length > 1" type="button" class="danger" @click="editEducation.splice(index, 1)">{{ t('Remove') }}</button></div>
+            <div class="grid"><div v-for="[key, label] in educationFields" :key="key" class="field"><label>{{ t(label) }}</label><input v-model="education[key]" /></div></div>
           </div>
         </section>
 
-        <section class="sticky-actions"><button type="button" @click="closeEmployeeEditor">Cancel</button><button class="primary" type="submit" :disabled="editLoading">{{ editLoading ? 'Saving…' : 'Save Employee Changes' }}</button></section>
+        <section class="sticky-actions"><button type="button" @click="closeEmployeeEditor">{{ t('Cancel') }}</button><button class="primary" type="submit" :disabled="editLoading">{{ t(editLoading ? 'Saving…' : 'Save Employee Changes') }}</button></section>
       </form>
 
       <section v-if="activeSection === 'requests'" class="card">
-        <h2>Update Requests</h2>
+        <h2>{{ t('Update Requests') }}</h2>
         <p class="muted">Requests are only needed when an approved employee's batch is inactive. Active batches allow updates immediately.</p>
         <div class="table-wrap"><table>
           <thead><tr><th>Merit List</th><th>Class ID</th><th>IPI</th><th>Name</th><th>Batch</th><th>Note</th><th>Status</th><th>Until</th><th>Actions</th></tr></thead>

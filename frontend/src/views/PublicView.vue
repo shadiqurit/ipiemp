@@ -4,6 +4,7 @@ import { api } from '../api';
 import AutoCompleteSelect from '../components/AutoCompleteSelect.vue';
 import DateInput from '../components/DateInput.vue';
 import { formatDateTime } from '../utils/dates';
+import { t } from '../i18n';
 
 const EXAMS = [
   'Class Five','Class Eight','JSC/JDC','SSC / Dakhil','HSC / Alim','Diploma',
@@ -19,6 +20,7 @@ const RELIGION_OPTIONS = [
   { value: 'B', label: 'Buddha' }, { value: 'C', label: 'Christian' }
 ];
 const MARITAL_STATUS_OPTIONS = [{ value: 'U', label: 'Unmarried' }, { value: 'M', label: 'Married' }];
+const examOptions = computed(() => EXAMS.map(value => ({ value, label: t(value) })));
 
 const state = ref({ collectionOpen:false, activeBatch:null });
 
@@ -315,48 +317,48 @@ onMounted(async () => {
   <main class="page">
     <section class="hero">
       <div>
-        <span class="badge">HR DATA COLLECTION</span>
-        <h1>Employee Information Portal</h1>
+        <span class="badge">{{ t('HR DATA COLLECTION') }}</span>
+        <h1>{{ t('Employee Information Portal') }}</h1>
         <p>Existing employees verify their details. New employees can submit a new entry.</p>
       </div>
 
       <div class="status">
-        <b>{{ state.collectionOpen ? 'ACTIVE' : 'INACTIVE' }}</b>
-        <span v-if="state.activeBatch">Batch: {{ state.activeBatch }}</span>
+        <b>{{ t(state.collectionOpen ? 'ACTIVE' : 'INACTIVE') }}</b>
+        <span v-if="state.activeBatch">{{ t('Batch') }}: {{ state.activeBatch }}</span>
       </div>
     </section>
 
     <section class="card">
-      <h2>Existing Employee Verification</h2>
+      <h2>{{ t('Existing Employee Verification') }}</h2>
       <p class="muted">
         For an existing record, all three values must match exactly.
       </p>
 
       <div class="grid">
         <div class="field">
-          <label>Merit List ID</label>
+          <label>{{ t('Merit List ID') }}</label>
           <input
             v-model="credentials.meritlistId"
             :disabled="!!mode"
-            placeholder="Enter Merit List ID"
+            :placeholder="t('Enter Merit List ID')"
           />
         </div>
 
         <div class="field">
-          <label>Class ID</label>
+          <label>{{ t('Class ID') }}</label>
           <input
             v-model="credentials.classId"
             :disabled="!!mode"
-            placeholder="Enter Class ID"
+            :placeholder="t('Enter Class ID')"
           />
         </div>
 
         <div class="field">
-          <label>Phone Number</label>
+          <label>{{ t('Phone Number') }}</label>
           <input
             v-model="credentials.phone"
             :disabled="!!mode"
-            placeholder="Enter primary phone"
+            :placeholder="t('Enter primary phone')"
             @keyup.enter="lookup"
           />
         </div>
@@ -369,7 +371,7 @@ onMounted(async () => {
           :disabled="busy"
           @click="lookup"
         >
-          Verify Existing Employee
+          {{ t('Verify Existing Employee') }}
         </button>
 
         <button
@@ -377,13 +379,13 @@ onMounted(async () => {
           type="button"
           @click="startOver"
         >
-          Use Another Employee
+          {{ t('Use Another Employee') }}
         </button>
       </div>
     </section>
 
     <section v-if="!mode" class="card">
-      <h2>New Employee</h2>
+      <h2>{{ t('New Employee') }}</h2>
       <p class="muted">
         New employees do not need to verify a phone number first. Enter Merit List ID and Class ID,
         then complete the form. The submission must be approved by an admin.
@@ -391,19 +393,19 @@ onMounted(async () => {
 
       <div class="grid">
         <div class="field">
-          <label>Merit List ID</label>
-          <input v-model="newIdentity.meritlistId" placeholder="Enter Merit List ID" />
+          <label>{{ t('Merit List ID') }}</label>
+          <input v-model="newIdentity.meritlistId" :placeholder="t('Enter Merit List ID')" />
         </div>
 
         <div class="field">
-          <label>Class ID</label>
-          <input v-model="newIdentity.classId" placeholder="Enter Class ID" @keyup.enter="startNew" />
+          <label>{{ t('Class ID') }}</label>
+          <input v-model="newIdentity.classId" :placeholder="t('Enter Class ID')" @keyup.enter="startNew" />
         </div>
       </div>
 
       <div class="lookup-actions">
         <button class="primary" :disabled="busy" @click="startNew">
-          Start New Employee Entry
+          {{ t('Start New Employee Entry') }}
         </button>
       </div>
     </section>
@@ -413,23 +415,23 @@ onMounted(async () => {
     <form v-if="mode" class="form" @submit.prevent="save">
       <section class="card">
         <div class="section-title">
-          <h2>Employee Identity</h2>
-          <span>Batch: {{ batchNo }}</span>
+          <h2>{{ t('Employee Identity') }}</h2>
+          <span>{{ t('Batch') }}: {{ batchNo }}</span>
         </div>
 
         <div class="grid">
           <div class="field">
-            <label>Merit List ID</label>
+            <label>{{ t('Merit List ID') }}</label>
             <input :value="verifiedIdentity.meritlistId" readonly />
           </div>
 
           <div class="field">
-            <label>Class ID</label>
+            <label>{{ t('Class ID') }}</label>
             <input :value="verifiedIdentity.classId" readonly />
           </div>
 
           <div class="field">
-            <label>IPI</label>
+            <label>{{ t('IPI') }}</label>
             <input
               :value="assignedIpi || 'Not assigned by admin yet'"
               readonly
@@ -440,7 +442,7 @@ onMounted(async () => {
 
       <section class="card">
         <div class="section-title">
-          <h2>Basic Information</h2>
+          <h2>{{ t('Basic Information') }}</h2>
         </div>
 
         <div class="grid">
@@ -449,31 +451,31 @@ onMounted(async () => {
             :key="key"
             class="field"
           >
-            <label>{{ label }}</label>
-            <select v-if="key === 'BLD_GROUP'" v-model="employee[key]" :disabled="!editable"><option value="">Select</option><option v-for="group in BLOOD_GROUPS" :key="group" :value="group">{{ group }}</option></select>
+            <label>{{ t(label) }}</label>
+            <select v-if="key === 'BLD_GROUP'" v-model="employee[key]" :disabled="!editable"><option value="">{{ t('Select') }}</option><option v-for="group in BLOOD_GROUPS" :key="group" :value="group">{{ group }}</option></select>
             <DateInput v-else-if="type === 'date'" v-model="employee[key]" :disabled="!editable" />
             <input v-else v-model="employee[key]" :type="type || 'text'" :disabled="!editable" />
           </div>
 
           <div class="field">
-            <label>Gender</label>
-            <select v-model="employee.GENDER" :disabled="!editable"><option value="">Select</option><option v-for="option in GENDER_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option></select>
+            <label>{{ t('Gender') }}</label>
+            <select v-model="employee.GENDER" :disabled="!editable"><option value="">{{ t('Select') }}</option><option v-for="option in GENDER_OPTIONS" :key="option.value" :value="option.value">{{ t(option.label) }}</option></select>
           </div>
 
           <div class="field">
-            <label>Religion</label>
-            <select v-model="employee.RELIGION" :disabled="!editable"><option value="">Select</option><option v-for="option in RELIGION_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option></select>
+            <label>{{ t('Religion') }}</label>
+            <select v-model="employee.RELIGION" :disabled="!editable"><option value="">{{ t('Select') }}</option><option v-for="option in RELIGION_OPTIONS" :key="option.value" :value="option.value">{{ t(option.label) }}</option></select>
           </div>
 
           <div class="field">
-            <label>Marital Status</label>
-            <select v-model="employee.MARITAL_STATUS" :disabled="!editable"><option value="">Select</option><option v-for="option in MARITAL_STATUS_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option></select>
+            <label>{{ t('Marital Status') }}</label>
+            <select v-model="employee.MARITAL_STATUS" :disabled="!editable"><option value="">{{ t('Select') }}</option><option v-for="option in MARITAL_STATUS_OPTIONS" :key="option.value" :value="option.value">{{ t(option.label) }}</option></select>
           </div>
         </div>
       </section>
 
       <section class="card">
-        <h2>Contact & Identity</h2>
+        <h2>{{ t('Contact & Identity') }}</h2>
 
         <div class="grid">
           <div
@@ -481,7 +483,7 @@ onMounted(async () => {
             :key="key"
             class="field"
           >
-            <label>{{ label }}</label>
+            <label>{{ t(label) }}</label>
             <input
               v-model="employee[key]"
               :type="type || 'text'"
@@ -499,34 +501,34 @@ onMounted(async () => {
       </section>
 
       <section class="card">
-        <h2>Address Information</h2>
+        <h2>{{ t('Address Information') }}</h2>
 
         <div class="address-grid">
           <div class="address-box">
-            <h3>Permanent Address</h3>
+            <h3>{{ t('Permanent Address') }}</h3>
 
-            <label>Village / House / Road</label>
+            <label>{{ t('Village / House / Road') }}</label>
             <input
               v-model="employee.PERMANENT_VILLAGE"
               :disabled="!editable"
               @input="onPermanentInput"
             />
 
-            <label>Post Office</label>
+            <label>{{ t('Post Office') }}</label>
             <input
               v-model="employee.PERMANENT_POST"
               :disabled="!editable"
               @input="onPermanentInput"
             />
 
-            <label>Thana / Upazila</label>
+            <label>{{ t('Thana / Upazila') }}</label>
             <input
               v-model="employee.PERMANENT_THANA"
               :disabled="!editable"
               @input="onPermanentInput"
             />
 
-            <label>District</label>
+            <label>{{ t('District') }}</label>
             <input
               v-model="employee.PERMANENT_DISTRICT"
               :disabled="!editable"
@@ -535,27 +537,27 @@ onMounted(async () => {
           </div>
 
           <div class="address-box">
-            <h3>Present Address</h3>
+            <h3>{{ t('Present Address') }}</h3>
 
-            <label>Village / House / Road</label>
+            <label>{{ t('Village / House / Road') }}</label>
             <input
               v-model="employee.PRESENT_VILLAGE"
               :disabled="!editable || sameAddress"
             />
 
-            <label>Post Office</label>
+            <label>{{ t('Post Office') }}</label>
             <input
               v-model="employee.PRESENT_POST"
               :disabled="!editable || sameAddress"
             />
 
-            <label>Thana / Upazila</label>
+            <label>{{ t('Thana / Upazila') }}</label>
             <input
               v-model="employee.PRESENT_THANA"
               :disabled="!editable || sameAddress"
             />
 
-            <label>District</label>
+            <label>{{ t('District') }}</label>
             <input
               v-model="employee.PRESENT_DISTRICT"
               :disabled="!editable || sameAddress"
@@ -570,17 +572,17 @@ onMounted(async () => {
               v-model="sameAddress"
               @change="toggleSame"
             />
-            Same as Permanent Address
+            {{ t('Same as Permanent Address') }}
           </label>
 
           <button type="button" @click="copyPermanent">
-            Copy Permanent → Present
+            {{ t('Copy Permanent → Present') }}
           </button>
         </div>
       </section>
 
       <section class="card">
-        <h2>Emergency Contact</h2>
+        <h2>{{ t('Emergency Contact') }}</h2>
 
         <div class="grid">
           <div
@@ -588,14 +590,14 @@ onMounted(async () => {
             :key="key"
             class="field"
           >
-            <label>{{ label }}</label>
+            <label>{{ t(label) }}</label>
             <input v-model="employee[key]" :disabled="!editable" />
           </div>
         </div>
       </section>
 
       <section class="card">
-        <h2>Family & Spouse</h2>
+        <h2>{{ t('Family & Spouse') }}</h2>
 
         <div class="grid">
           <div
@@ -603,7 +605,7 @@ onMounted(async () => {
             :key="key"
             class="field"
           >
-            <label>{{ label }}</label>
+            <label>{{ t(label) }}</label>
             <input
               v-model="employee[key]"
               :type="type || 'text'"
@@ -614,7 +616,7 @@ onMounted(async () => {
       </section>
 
       <section class="card">
-        <h2>Guarantor Information</h2>
+        <h2>{{ t('Guarantor Information') }}</h2>
 
         <div class="grid">
           <div
@@ -622,7 +624,7 @@ onMounted(async () => {
             :key="key"
             class="field"
           >
-            <label>{{ label }}</label>
+            <label>{{ t(label) }}</label>
             <input v-model="employee[key]" :disabled="!editable" />
           </div>
         </div>
@@ -630,14 +632,14 @@ onMounted(async () => {
 
       <section class="card">
         <div class="section-title">
-          <h2>Education</h2>
+          <h2>{{ t('Education') }}</h2>
 
           <button
             v-if="editable"
             type="button"
             @click="education.push(blankEducation())"
           >
-            + Add Education
+            {{ t('+ Add Education') }}
           </button>
         </div>
 
@@ -647,7 +649,7 @@ onMounted(async () => {
           class="edu"
         >
           <div class="section-title">
-            <b>Education #{{ i+1 }}</b>
+            <b>{{ t('Education') }} #{{ i+1 }}</b>
 
             <button
               v-if="editable && education.length > 1"
@@ -655,49 +657,49 @@ onMounted(async () => {
               class="danger"
               @click="education.splice(i,1)"
             >
-              Remove
+              {{ t('Remove') }}
             </button>
           </div>
 
           <div class="grid">
             <div class="field">
-              <label>Exam Name</label>
+              <label>{{ t('Exam Name') }}</label>
 
-              <AutoCompleteSelect v-model="edu.EXAMNAME" :options="EXAMS" :disabled="!editable" placeholder="Search exam name" />
+              <AutoCompleteSelect v-model="edu.EXAMNAME" :options="examOptions" :disabled="!editable" :placeholder="t('Search exam name')" />
             </div>
 
             <div class="field">
-              <label>Group</label>
+              <label>{{ t('Group') }}</label>
               <input v-model="edu.EXAMGROUP" :disabled="!editable" />
             </div>
 
             <div class="field">
-              <label>Board / University</label>
+              <label>{{ t('Board / University') }}</label>
               <input v-model="edu.BOARD" :disabled="!editable" />
             </div>
 
             <div class="field">
-              <label>Class / Result</label>
+              <label>{{ t('Class / Result') }}</label>
               <input v-model="edu.CLAS" :disabled="!editable" />
             </div>
 
             <div class="field">
-              <label>Pass Year</label>
+              <label>{{ t('Pass Year') }}</label>
               <input v-model="edu.PASSYEAR" :disabled="!editable" />
             </div>
 
             <div class="field">
-              <label>Subject</label>
+              <label>{{ t('Subject') }}</label>
               <input v-model="edu.SUBJECT_NAME" :disabled="!editable" />
             </div>
 
             <div class="field">
-              <label>Institute</label>
+              <label>{{ t('Institute') }}</label>
               <input v-model="edu.INSTITUTE" :disabled="!editable" />
             </div>
 
             <div class="field">
-              <label>Remarks</label>
+              <label>{{ t('Remarks') }}</label>
               <input v-model="edu.REMARKS" :disabled="!editable" />
             </div>
           </div>
@@ -710,7 +712,7 @@ onMounted(async () => {
           type="button"
           @click="requestUpdate"
         >
-          Request Update Access
+          {{ t('Request Update Access') }}
         </button>
 
         <button
@@ -718,7 +720,7 @@ onMounted(async () => {
           type="button"
           disabled
         >
-          Request Pending
+          {{ t('Request Pending') }}
         </button>
 
         <button
@@ -727,13 +729,13 @@ onMounted(async () => {
           :disabled="busy"
           type="submit"
         >
-          {{ mode === 'EDIT' ? 'Update Employee' : 'Submit Employee Data' }}
+          {{ t(mode === 'EDIT' ? 'Update Employee' : 'Submit Employee Data') }}
         </button>
       </section>
     </form>
 
     <footer>
-      <router-link to="/admin">Admin</router-link>
+      <router-link to="/admin">{{ t('Admin') }}</router-link>
     </footer>
   </main>
 </template>
