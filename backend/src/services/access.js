@@ -15,7 +15,21 @@ export async function getActiveBatch(conn) {
   return rows[0] || null;
 }
 
-export async function getEmployeePermission(conn, empEntryId, batchNo) {
+export async function getEmployeePermission(
+  conn,
+  empEntryId,
+  batchNo,
+  approvalStatus = 'APPROVED'
+) {
+  if (approvalStatus !== 'APPROVED') {
+    return {
+      canEdit: false,
+      reason: approvalStatus === 'REJECTED' ? 'REJECTED' : 'PENDING_APPROVAL',
+      approvedUntil: null,
+      pending: false
+    };
+  }
+
   const [batchRows] = await conn.execute(
     `SELECT STATUS
        FROM HR_BATCH_CONTROL

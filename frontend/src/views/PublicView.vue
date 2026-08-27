@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 import { api } from '../api';
+import AutoCompleteSelect from '../components/AutoCompleteSelect.vue';
+import DateInput from '../components/DateInput.vue';
+import { formatDateTime } from '../utils/dates';
 
 const EXAMS = [
   'Class Five','Class Eight','JSC/JDC','SSC / Dakhil','HSC / Alim','Diploma',
@@ -9,12 +12,25 @@ const EXAMS = [
   'BAMS','BHMS','BUMS','M.Phil','Ph.D','CA','FCA','CMA / ACMA','PGD','Others'
 ];
 
+const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const GENDER_OPTIONS = [{ value: 'M', label: 'Male' }, { value: 'F', label: 'Female' }];
+const RELIGION_OPTIONS = [
+  { value: 'I', label: 'Islam' }, { value: 'H', label: 'Hindu' },
+  { value: 'B', label: 'Buddha' }, { value: 'C', label: 'Christian' }
+];
+const MARITAL_STATUS_OPTIONS = [{ value: 'U', label: 'Unmarried' }, { value: 'M', label: 'Married' }];
+
 const state = ref({ collectionOpen:false, activeBatch:null });
 
 const credentials = reactive({
   meritlistId: '',
   classId: '',
   phone: ''
+});
+
+const newIdentity = reactive({
+  meritlistId: '',
+  classId: ''
 });
 
 const verifiedIdentity = reactive({
@@ -135,22 +151,8 @@ async function lookup() {
     resetEmployee();
 
     if (!data.found) {
-      if (!data.canCreate) {
-        mode.value = '';
-        message.value = 'No record found and there is no ACTIVE batch.';
-        return;
-      }
-
-      mode.value = 'NEW';
-      batchNo.value = data.activeBatch || '';
-      employee.PHONE = verifiedIdentity.phone;
-      education.value = [blankEducation()];
-      canRequestUpdate.value = false;
-      requestPending.value = false;
-
-      message.value =
-        'New employee entry. Merit List ID, Class ID and Phone are verified for this session.';
-
+      mode.value = '';
+      message.value = 'No existing employee was found. Use the New Employee section to submit a new entry.';
       return;
     }
 
@@ -169,9 +171,15 @@ async function lookup() {
     canRequestUpdate.value = !!data.canRequestUpdate;
     requestPending.value = !!data.pending;
 
-    if (data.reason === 'TEMP_APPROVAL') {
+    if (data.reason === 'PENDING_APPROVAL') {
+      message.value = 'Identity verified. Your new employee data is waiting for admin approval.';
+
+    } else if (data.reason === 'REJECTED') {
+      message.value = 'Identity verified. This employee entry was not approved. Please contact an administrator.';
+
+    } else if (data.reason === 'TEMP_APPROVAL') {
       message.value =
-        `Identity verified. Admin approved temporary update access until ${data.approvedUntil}.`;
+        `Identity verified. Admin approved temporary update access until ${formatDateTime(data.approvedUntil)}.`;
 
     } else if (data.canEdit) {
       message.value =
@@ -195,18 +203,56 @@ async function lookup() {
   }
 }
 
+async function startNew() {
+  if (!newIdentity.meritlistId.trim() || !newIdentity.classId.trim()) {
+    message.value = 'Merit List ID and Class ID are required for a new employee.';
+    return;
+  }
+
+  busy.value = true;
+
+  try {
+    const { data } = await api.post('/public/employee/new-entry', {
+      meritlistId: newIdentity.meritlistId.trim(),
+      classId: newIdentity.classId.trim()
+    });
+
+    verifiedIdentity.meritlistId = data.identity.meritlistId;
+    verifiedIdentity.classId = data.identity.classId;
+    verifiedIdentity.phone = '';
+    resetEmployee();
+    mode.value = 'NEW';
+    batchNo.value = data.activeBatch;
+    canRequestUpdate.value = false;
+    requestPending.value = false;
+    message.value = 'New employee entry. Complete the form and submit it for admin approval.';
+  } catch (e) {
+    message.value = e.response?.data?.message || e.message;
+  } finally {
+    busy.value = false;
+  }
+}
+
 async function save() {
   busy.value = true;
 
   try {
+    const isNewEntry = mode.value === 'NEW';
     const { data } = await api.post('/public/employee/save', {
       identity: verifiedIdentity,
       employee,
-      education: education.value
+      education: education.value,
+      newEntry: isNewEntry
     });
 
     message.value = data.message || 'Employee information saved successfully.';
-    await lookup();
+    if (isNewEntry) {
+      mode.value = 'VIEW';
+      canRequestUpdate.value = false;
+      requestPending.value = false;
+    } else {
+      await lookup();
+    }
 
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
@@ -251,6 +297,8 @@ function startOver() {
   credentials.meritlistId = '';
   credentials.classId = '';
   credentials.phone = '';
+  newIdentity.meritlistId = '';
+  newIdentity.classId = '';
   verifiedIdentity.meritlistId = '';
   verifiedIdentity.classId = '';
   verifiedIdentity.phone = '';
@@ -269,7 +317,7 @@ onMounted(async () => {
       <div>
         <span class="badge">HR DATA COLLECTION</span>
         <h1>Employee Information Portal</h1>
-        <p>Enter Merit List ID, Class ID and Phone Number to continue.</p>
+        <p>Existing employees verify their details. New employees can submit a new entry.</p>
       </div>
 
       <div class="status">
@@ -279,7 +327,7 @@ onMounted(async () => {
     </section>
 
     <section class="card">
-      <h2>Verify Employee</h2>
+      <h2>Existing Employee Verification</h2>
       <p class="muted">
         For an existing record, all three values must match exactly.
       </p>
@@ -321,7 +369,7 @@ onMounted(async () => {
           :disabled="busy"
           @click="lookup"
         >
-          Verify / Continue
+          Verify Existing Employee
         </button>
 
         <button
@@ -330,6 +378,32 @@ onMounted(async () => {
           @click="startOver"
         >
           Use Another Employee
+        </button>
+      </div>
+    </section>
+
+    <section v-if="!mode" class="card">
+      <h2>New Employee</h2>
+      <p class="muted">
+        New employees do not need to verify a phone number first. Enter Merit List ID and Class ID,
+        then complete the form. The submission must be approved by an admin.
+      </p>
+
+      <div class="grid">
+        <div class="field">
+          <label>Merit List ID</label>
+          <input v-model="newIdentity.meritlistId" placeholder="Enter Merit List ID" />
+        </div>
+
+        <div class="field">
+          <label>Class ID</label>
+          <input v-model="newIdentity.classId" placeholder="Enter Class ID" @keyup.enter="startNew" />
+        </div>
+      </div>
+
+      <div class="lookup-actions">
+        <button class="primary" :disabled="busy" @click="startNew">
+          Start New Employee Entry
         </button>
       </div>
     </section>
@@ -376,40 +450,24 @@ onMounted(async () => {
             class="field"
           >
             <label>{{ label }}</label>
-            <input
-              v-model="employee[key]"
-              :type="type || 'text'"
-              :disabled="!editable"
-            />
+            <select v-if="key === 'BLD_GROUP'" v-model="employee[key]" :disabled="!editable"><option value="">Select</option><option v-for="group in BLOOD_GROUPS" :key="group" :value="group">{{ group }}</option></select>
+            <DateInput v-else-if="type === 'date'" v-model="employee[key]" :disabled="!editable" />
+            <input v-else v-model="employee[key]" :type="type || 'text'" :disabled="!editable" />
           </div>
 
           <div class="field">
             <label>Gender</label>
-            <select v-model="employee.GENDER" :disabled="!editable">
-              <option value="">Select</option>
-              <option value="M">Male</option>
-              <option value="F">Female</option>
-            </select>
+            <select v-model="employee.GENDER" :disabled="!editable"><option value="">Select</option><option v-for="option in GENDER_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option></select>
           </div>
 
           <div class="field">
             <label>Religion</label>
-            <select v-model="employee.RELIGION" :disabled="!editable">
-              <option value="">Select</option>
-              <option value="I">Islam</option>
-              <option value="H">Hindu</option>
-              <option value="B">Buddha</option>
-              <option value="C">Christian</option>
-            </select>
+            <select v-model="employee.RELIGION" :disabled="!editable"><option value="">Select</option><option v-for="option in RELIGION_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option></select>
           </div>
 
           <div class="field">
             <label>Marital Status</label>
-            <select v-model="employee.MARITAL_STATUS" :disabled="!editable">
-              <option value="">Select</option>
-              <option value="U">Single</option>
-              <option value="M">Married</option>
-            </select>
+            <select v-model="employee.MARITAL_STATUS" :disabled="!editable"><option value="">Select</option><option v-for="option in MARITAL_STATUS_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option></select>
           </div>
         </div>
       </section>
@@ -427,12 +485,15 @@ onMounted(async () => {
             <input
               v-model="employee[key]"
               :type="type || 'text'"
-              :disabled="!editable || key === 'PHONE'"
+              :disabled="!editable || (key === 'PHONE' && mode !== 'NEW')"
             />
           </div>
         </div>
 
-        <p class="muted">
+        <p class="muted" v-if="mode === 'NEW'">
+          Enter a primary phone number. This will be required for future employee verification.
+        </p>
+        <p class="muted" v-else>
           Primary phone is part of employee verification and cannot be changed from this public session.
         </p>
       </section>
@@ -602,16 +663,7 @@ onMounted(async () => {
             <div class="field">
               <label>Exam Name</label>
 
-              <select v-model="edu.EXAMNAME" :disabled="!editable">
-                <option value="">Select</option>
-                <option
-                  v-for="x in EXAMS"
-                  :key="x"
-                  :value="x"
-                >
-                  {{ x }}
-                </option>
-              </select>
+              <AutoCompleteSelect v-model="edu.EXAMNAME" :options="EXAMS" :disabled="!editable" placeholder="Search exam name" />
             </div>
 
             <div class="field">

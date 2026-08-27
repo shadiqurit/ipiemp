@@ -74,6 +74,18 @@ async function getVerifiedEmployee(conn, meritlistId, classId, phone, lock = fal
   return rows[0] || null;
 }
 
+async function getEmployeeByIdentity(conn, meritlistId, classId, lock = false) {
+  const sql =
+    `SELECT *
+       FROM UP_EMP
+      WHERE MERITLIST_ID = ?
+        AND CLASS_ID = ?
+      LIMIT 1` + (lock ? ' FOR UPDATE' : '');
+
+  const [rows] = await conn.execute(sql, [meritlistId, classId]);
+  return rows[0] || null;
+}
+
 router.get('/app-state', async (req, res, next) => {
   try {
     const conn = await pool.getConnection();
@@ -160,7 +172,8 @@ router.post('/employee/lookup', async (req, res, next) => {
     const permission = await getEmployeePermission(
       conn,
       employee.EMP_ENTRY_ID,
-      employee.batch_no
+      employee.batch_no,
+      employee.APPROVAL_STATUS
     );
 
     const [education] = await conn.execute(
@@ -178,7 +191,56 @@ router.post('/employee/lookup', async (req, res, next) => {
       education,
       batchNo: employee.batch_no,
       ...permission,
-      canRequestUpdate: !permission.canEdit && !permission.pending
+      canRequestUpdate:
+        employee.APPROVAL_STATUS === 'APPROVED' &&
+        !permission.canEdit &&
+        !permission.pending
+    });
+
+  } catch (e) {
+    next(e);
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * New employees enter Merit List ID and Class ID themselves. They do not need
+ * to verify a phone number because no employee record exists yet.
+ */
+router.post('/employee/new-entry', async (req, res, next) => {
+  const meritlistId = String(req.body?.meritlistId || '').trim();
+  const classId = String(req.body?.classId || '').trim();
+
+  if (!meritlistId || !classId) {
+    return res.status(400).json({
+      message: 'Merit List ID and Class ID are required.'
+    });
+  }
+
+  const conn = await pool.getConnection();
+
+  try {
+    const existing = await getEmployeeByIdentity(conn, meritlistId, classId);
+
+    if (existing) {
+      return res.status(409).json({
+        message: 'This Merit List ID and Class ID already exists. Please use existing employee verification.'
+      });
+    }
+
+    const active = await getActiveBatch(conn);
+
+    if (!active) {
+      return res.status(409).json({
+        message: 'New employee submissions are available only while a batch is ACTIVE.'
+      });
+    }
+
+    res.json({
+      canCreate: true,
+      activeBatch: active.BATCH_NO,
+      identity: { meritlistId, classId }
     });
 
   } catch (e) {
@@ -189,15 +251,18 @@ router.post('/employee/lookup', async (req, res, next) => {
 });
 
 router.post('/employee/save', async (req, res, next) => {
+  const newEntry = Boolean(req.body?.newEntry);
   const identity = {
     meritlistId: String(req.body?.identity?.meritlistId || '').trim(),
     classId: String(req.body?.identity?.classId || '').trim(),
     phone: normalizedPhone(req.body?.identity?.phone)
   };
 
-  if (!identity.meritlistId || !identity.classId || !identity.phone) {
+  if (!identity.meritlistId || !identity.classId || (!newEntry && !identity.phone)) {
     return res.status(400).json({
-      message: 'Merit List ID, Class ID and Phone Number are required.'
+      message: newEntry
+        ? 'Merit List ID and Class ID are required.'
+        : 'Merit List ID, Class ID and Phone Number are required.'
     });
   }
 
@@ -210,8 +275,8 @@ router.post('/employee/save', async (req, res, next) => {
 
   validateEmployee(employee);
 
-  // The public form cannot change the verification phone behind the server's back.
-  if (normalizedPhone(employee.PHONE) !== identity.phone) {
+  // Existing employees cannot change the phone used for verification.
+  if (!newEntry && normalizedPhone(employee.PHONE) !== identity.phone) {
     return res.status(400).json({
       message: 'Primary phone cannot be changed in this session.'
     });
@@ -222,33 +287,46 @@ router.post('/employee/save', async (req, res, next) => {
   try {
     await conn.beginTransaction();
 
-    let current = await getVerifiedEmployee(
-      conn,
-      identity.meritlistId,
-      identity.classId,
-      identity.phone,
-      true
-    );
+    let current = newEntry
+      ? await getEmployeeByIdentity(
+        conn,
+        identity.meritlistId,
+        identity.classId,
+        true
+      )
+      : await getVerifiedEmployee(
+        conn,
+        identity.meritlistId,
+        identity.classId,
+        identity.phone,
+        true
+      );
 
     let empEntryId;
     let ipi = null;
 
-    if (!current) {
-      const [sameIdentity] = await conn.execute(
-        `SELECT EMP_ENTRY_ID
-           FROM UP_EMP
-          WHERE MERITLIST_ID = ?
-            AND CLASS_ID = ?
-          LIMIT 1
-          FOR UPDATE`,
-        [identity.meritlistId, identity.classId]
+    if (newEntry && current) {
+      throw Object.assign(
+        new Error('This Merit List ID and Class ID already exists. Please use existing employee verification.'),
+        { status: 409 }
       );
+    }
 
-      if (sameIdentity[0]) {
-        throw Object.assign(
-          new Error('This Merit List ID and Class ID already exists. Phone verification failed.'),
-          { status: 401 }
+    if (!current) {
+      if (!newEntry) {
+        const sameIdentity = await getEmployeeByIdentity(
+          conn,
+          identity.meritlistId,
+          identity.classId,
+          true
         );
+
+        if (sameIdentity) {
+          throw Object.assign(
+            new Error('This Merit List ID and Class ID already exists. Phone verification failed.'),
+            { status: 401 }
+          );
+        }
       }
 
       const active = await getActiveBatch(conn);
@@ -264,14 +342,16 @@ router.post('/employee/save', async (req, res, next) => {
         'MERITLIST_ID',
         'CLASS_ID',
         ...EMP_COLUMNS,
-        'batch_no'
+        'batch_no',
+        'APPROVAL_STATUS'
       ];
 
       const values = [
         identity.meritlistId,
         identity.classId,
         ...EMP_COLUMNS.map(c => employee[c] || null),
-        active.BATCH_NO
+        active.BATCH_NO,
+        'PENDING'
       ];
 
       const [result] = await conn.execute(
@@ -290,7 +370,8 @@ router.post('/employee/save', async (req, res, next) => {
       const permission = await getEmployeePermission(
         conn,
         current.EMP_ENTRY_ID,
-        current.batch_no
+        current.batch_no,
+        current.APPROVAL_STATUS
       );
 
       if (!permission.canEdit) {
@@ -356,7 +437,7 @@ router.post('/employee/save', async (req, res, next) => {
       ipi,
       message: current
         ? 'Employee information updated successfully.'
-        : 'Employee information submitted successfully.'
+        : 'Employee information submitted and is waiting for admin approval.'
     });
 
   } catch (e) {
@@ -402,8 +483,16 @@ router.post('/employee/update-request', async (req, res, next) => {
     const permission = await getEmployeePermission(
       conn,
       employee.EMP_ENTRY_ID,
-      employee.batch_no
+      employee.batch_no,
+      employee.APPROVAL_STATUS
     );
+
+    if (employee.APPROVAL_STATUS !== 'APPROVED') {
+      throw Object.assign(
+        new Error('This employee record is waiting for admin approval.'),
+        { status: 403 }
+      );
+    }
 
     if (permission.canEdit) {
       await conn.rollback();
