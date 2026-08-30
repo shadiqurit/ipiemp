@@ -5,10 +5,12 @@ import { api, setAdminToken } from '../api';
 import AutoCompleteSelect from '../components/AutoCompleteSelect.vue';
 import DateInput from '../components/DateInput.vue';
 import PhoneInput from '../components/PhoneInput.vue';
+import NidInput from '../components/NidInput.vue';
 import EducationLevels from '../components/EducationLevels.vue';
 import HeightInput from '../components/HeightInput.vue';
 import WeightInput from '../components/WeightInput.vue';
 import { normalizeEducationRows } from '../utils/education';
+import { notifyError, notifySuccess } from '../utils/notifications';
 import { t } from '../i18n';
 
 const props = defineProps({ empEntryId: { type: String, required: true } });
@@ -71,9 +73,11 @@ async function save() {
       education: education.value
     });
     message.value = data.message;
+    notifySuccess(message.value, 'Employee updated');
     await load();
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Employee could not be updated');
   } finally {
     saving.value = false;
   }
@@ -138,7 +142,7 @@ onMounted(load);
           <div class="field"><label>{{ t('Email') }}</label><input v-model="employee.EMAIL" type="email" /></div>
           <div class="field"><label>{{ t('Primary Phone') }} *</label><PhoneInput v-model="employee.PHONE" autocomplete="tel" /></div>
           <div class="field"><label>{{ t('Alternate Phone') }} *</label><PhoneInput v-model="employee.PHONE1" /></div>
-          <div class="field"><label>{{ t('NID') }}</label><input v-model="employee.NID" /></div>
+          <div class="field"><label>{{ t('NID') }}</label><NidInput v-model="employee.NID" /></div>
         </div>
       </section>
 
@@ -162,7 +166,7 @@ onMounted(load);
 
       <section class="card">
         <h2>{{ t('Guarantor Information') }}</h2>
-        <div class="grid"><div class="field"><label>{{ t('Guarantor Name') }}</label><input v-model="employee.GRNT_NAME" /></div><div class="field"><label>{{ t('Relationship') }}</label><input v-model="employee.GRNT_RELE" /></div><div class="field"><label>{{ t('Guarantor Father') }}</label><input v-model="employee.GRNT_FATHER" /></div><div class="field"><label>{{ t('Present Address') }}</label><input v-model="employee.GRNT_PRESENT_ADD" /></div><div class="field"><label>{{ t('Permanent Address') }}</label><input v-model="employee.GRNT_PERMANET_ADD" /></div><div class="field"><label>{{ t('Nationality') }}</label><input v-model="employee.GRNT_NATIONALITY" /></div><div class="field"><label>{{ t('Profession') }}</label><input v-model="employee.GRNT_PROFFESSION" /></div><div class="field"><label>{{ t('NID') }}</label><input v-model="employee.GRNT_NID" /></div><div class="field"><label>{{ t('Mobile') }} *</label><PhoneInput v-model="employee.GRNT_MOBILE" /></div></div>
+        <div class="grid"><div class="field"><label>{{ t('Guarantor Name') }}</label><input v-model="employee.GRNT_NAME" /></div><div class="field"><label>{{ t('Relationship') }}</label><input v-model="employee.GRNT_RELE" /></div><div class="field"><label>{{ t('Guarantor Father') }}</label><input v-model="employee.GRNT_FATHER" /></div><div class="field"><label>{{ t('Present Address') }}</label><input v-model="employee.GRNT_PRESENT_ADD" /></div><div class="field"><label>{{ t('Permanent Address') }}</label><input v-model="employee.GRNT_PERMANET_ADD" /></div><div class="field"><label>{{ t('Nationality') }}</label><input v-model="employee.GRNT_NATIONALITY" /></div><div class="field"><label>{{ t('Profession') }}</label><input v-model="employee.GRNT_PROFFESSION" /></div><div class="field"><label>{{ t('NID') }}</label><NidInput v-model="employee.GRNT_NID" /></div><div class="field"><label>{{ t('Mobile') }} *</label><PhoneInput v-model="employee.GRNT_MOBILE" /></div></div>
       </section>
 
       <section class="card">

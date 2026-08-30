@@ -26,6 +26,12 @@ function isRequired(index) {
   return ['EXAMNAME', 'BOARD', 'CLAS', 'PASSYEAR', 'INSTITUTE', 'EXAMGROUP', 'SUBJECT_NAME', 'REMARKS']
     .some(key => String(row[key] || '').trim());
 }
+
+function selectEducationBoard(item) {
+  if (item.EXAMNAME === 'Dakhil' || item.EXAMNAME === 'Alim') {
+    item.BOARD = 'Madrasa';
+  }
+}
 </script>
 
 <template>
@@ -40,7 +46,12 @@ function isRequired(index) {
     <div class="grid">
       <div class="field">
         <label>{{ t('Education Level') }}<span v-if="isRequired(index)"> *</span></label>
-        <select v-model="item.EXAMNAME" :disabled="disabled" :required="isRequired(index)">
+        <select
+          v-model="item.EXAMNAME"
+          :disabled="disabled"
+          :required="isRequired(index)"
+          @change="selectEducationBoard(item)"
+        >
           <option value="">{{ t('Select') }}</option>
           <option v-for="degree in EDUCATION_LEVEL_OPTIONS[index]" :key="degree" :value="degree">{{ degree }}</option>
         </select>

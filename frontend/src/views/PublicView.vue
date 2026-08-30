@@ -3,11 +3,13 @@ import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { api } from '../api';
 import DateInput from '../components/DateInput.vue';
 import PhoneInput from '../components/PhoneInput.vue';
+import NidInput from '../components/NidInput.vue';
 import EducationLevels from '../components/EducationLevels.vue';
 import HeightInput from '../components/HeightInput.vue';
 import WeightInput from '../components/WeightInput.vue';
 import { formatDateTime } from '../utils/dates';
 import { normalizeEducationRows } from '../utils/education';
+import { notifyError, notifySuccess } from '../utils/notifications';
 import { t } from '../i18n';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -256,6 +258,7 @@ async function save() {
     });
 
     message.value = data.message || 'Employee information saved successfully.';
+    notifySuccess(message.value, isNewEntry ? 'Employee submitted' : 'Employee updated');
     if (isNewEntry) {
       mode.value = 'VIEW';
       canRequestUpdate.value = false;
@@ -266,6 +269,7 @@ async function save() {
 
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Employee could not be saved');
 
   } finally {
     busy.value = false;
@@ -289,10 +293,12 @@ async function requestUpdate() {
     );
 
     message.value = data.message;
+    notifySuccess(message.value, 'Request submitted');
     await lookup();
 
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Request could not be submitted');
 
   } finally {
     busy.value = false;
@@ -516,6 +522,7 @@ onMounted(async () => {
               :disabled="!editable || (key === 'PHONE' && mode !== 'NEW')"
               :autocomplete="key === 'PHONE' ? 'tel' : 'off'"
             />
+            <NidInput v-else-if="key === 'NID'" v-model="employee[key]" :disabled="!editable" />
             <input v-else v-model="employee[key]" :type="type || 'text'" :autocomplete="key === 'EMAIL' ? 'email' : 'off'" :disabled="!editable" />
           </div>
         </div>
@@ -657,6 +664,7 @@ onMounted(async () => {
           >
             <label>{{ t(label) }}<span v-if="key === 'GRNT_MOBILE'" class="required-mark"> *</span></label>
             <PhoneInput v-if="key === 'GRNT_MOBILE'" v-model="employee[key]" :disabled="!editable" />
+            <NidInput v-else-if="key === 'GRNT_NID'" v-model="employee[key]" :disabled="!editable" />
             <input v-else v-model="employee[key]" :disabled="!editable" />
           </div>
         </div>

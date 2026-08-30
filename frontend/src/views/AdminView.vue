@@ -4,11 +4,13 @@ import { api, setAdminToken } from '../api';
 import AutoCompleteSelect from '../components/AutoCompleteSelect.vue';
 import DateInput from '../components/DateInput.vue';
 import PhoneInput from '../components/PhoneInput.vue';
+import NidInput from '../components/NidInput.vue';
 import EducationLevels from '../components/EducationLevels.vue';
 import HeightInput from '../components/HeightInput.vue';
 import WeightInput from '../components/WeightInput.vue';
 import { formatDateTime } from '../utils/dates';
 import { normalizeEducationRows } from '../utils/education';
+import { notifyError, notifySuccess } from '../utils/notifications';
 import { t } from '../i18n';
 
 const token = ref(localStorage.getItem('admin_token') || '');
@@ -108,6 +110,7 @@ async function createUser() {
   try {
     const { data } = await api.post('/admin/users', newUser);
     message.value = data.message;
+    notifySuccess(message.value, 'User created');
     newUser.username = '';
     newUser.displayName = '';
     newUser.password = '';
@@ -116,6 +119,7 @@ async function createUser() {
     activeSection.value = 'users';
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'User could not be created');
   }
 }
 
@@ -127,30 +131,36 @@ async function updateUserPassword() {
       { password: replacementPassword.value }
     );
     message.value = data.message;
+    notifySuccess(message.value, 'Password updated');
     replacementPassword.value = '';
     selectedUser.value = null;
     passwordModalOpen.value = false;
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Password could not be updated');
   }
 }
 
 async function addBatch() {
   try {
     await api.post('/admin/batches', { batchNo: newBatch.value });
+    notifySuccess('The new batch was added successfully.', 'Batch created');
     newBatch.value = '';
     await refresh();
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Batch could not be created');
   }
 }
 
 async function setBatch(batchNo, status) {
   try {
     await api.patch(`/admin/batches/${encodeURIComponent(batchNo)}/status`, { status });
+    notifySuccess(`Batch ${batchNo} is now ${status.toLowerCase()}.`, 'Batch updated');
     await refresh();
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Batch could not be updated');
   }
 }
 
@@ -158,9 +168,11 @@ async function approveEmployee(employee, approvalStatus) {
   try {
     const { data } = await api.patch(`/admin/employees/${employee.EMP_ENTRY_ID}/approval`, { approvalStatus });
     message.value = data.message;
+    notifySuccess(message.value, 'Employee status updated');
     await refresh();
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Employee status could not be updated');
   }
 }
 
@@ -170,9 +182,11 @@ async function assignIpi(employee) {
   try {
     const { data } = await api.patch(`/admin/employees/${employee.EMP_ENTRY_ID}/ipi`, { ipi: ipi.trim() });
     message.value = data.message;
+    notifySuccess(message.value, 'IPI assigned');
     await refresh();
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'IPI could not be assigned');
   }
 }
 
@@ -204,10 +218,12 @@ async function saveEmployeeDetails() {
       education: editEducation.value
     });
     message.value = data.message;
+    notifySuccess(message.value, 'Employee updated');
     selectedEmployeeId.value = null;
     await refresh();
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Employee could not be updated');
   } finally {
     editLoading.value = false;
   }
@@ -221,9 +237,11 @@ async function decide(id, status) {
   const remark = window.prompt('Admin remarks (optional)') || '';
   try {
     await api.patch(`/admin/update-requests/${id}`, { status, remark });
+    notifySuccess(`The update request was ${status.toLowerCase()}.`, 'Request updated');
     await refresh();
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Request could not be updated');
   }
 }
 
@@ -392,7 +410,7 @@ onMounted(refresh);
             <div class="field"><label>{{ t('Email') }}</label><input v-model="editEmployee.EMAIL" type="email" /></div>
             <div class="field"><label>{{ t('Primary Phone') }} *</label><PhoneInput v-model="editEmployee.PHONE" autocomplete="tel" /></div>
             <div class="field"><label>{{ t('Alternate Phone') }} *</label><PhoneInput v-model="editEmployee.PHONE1" /></div>
-            <div class="field"><label>{{ t('NID') }}</label><input v-model="editEmployee.NID" /></div>
+            <div class="field"><label>{{ t('NID') }}</label><NidInput v-model="editEmployee.NID" /></div>
           </div>
         </section>
 
@@ -446,7 +464,7 @@ onMounted(refresh);
             <div class="field"><label>{{ t('Permanent Address') }}</label><input v-model="editEmployee.GRNT_PERMANET_ADD" /></div>
             <div class="field"><label>{{ t('Nationality') }}</label><input v-model="editEmployee.GRNT_NATIONALITY" /></div>
             <div class="field"><label>{{ t('Profession') }}</label><input v-model="editEmployee.GRNT_PROFFESSION" /></div>
-            <div class="field"><label>{{ t('NID') }}</label><input v-model="editEmployee.GRNT_NID" /></div>
+            <div class="field"><label>{{ t('NID') }}</label><NidInput v-model="editEmployee.GRNT_NID" /></div>
             <div class="field"><label>{{ t('Mobile') }} *</label><PhoneInput v-model="editEmployee.GRNT_MOBILE" /></div>
           </div>
         </section>

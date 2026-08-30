@@ -29,7 +29,6 @@ function onInput(event) {
       :disabled="disabled"
       @input="onInput"
     />
-    <span aria-hidden="true">kg</span>
   </div>
 </template>
 
@@ -42,18 +41,6 @@ function onInput(event) {
 
 .weight-input input {
   min-width: 0;
-  border-radius: 0.55rem 0 0 0.55rem;
-}
-
-.weight-input span {
-  display: flex;
-  align-items: center;
-  padding: 0 0.75rem;
-  border: 1px solid #cbd5e1;
-  border-left: 0;
-  border-radius: 0 0.55rem 0.55rem 0;
-  background: #f1f5f9;
-  color: #334155;
-  font-weight: 700;
+  border-radius: 0.55rem;
 }
 </style>

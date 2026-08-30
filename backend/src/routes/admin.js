@@ -6,6 +6,7 @@ import { requireAdmin, signAdmin } from '../auth.js';
 import { normalizeAndValidateEmployeePhones } from '../utils/phones.js';
 import { validateAndNormalizeEducation } from '../utils/education.js';
 import { normalizeAndValidateMeasurements } from '../utils/measurements.js';
+import { normalizeAndValidateEmployeeNids } from '../utils/nid.js';
 
 const router = Router();
 
@@ -49,6 +50,7 @@ function validateEmployee(employee) {
 
   normalizeAndValidateEmployeePhones(employee);
   normalizeAndValidateMeasurements(employee);
+  normalizeAndValidateEmployeeNids(employee);
 
   if (employee.MARITAL_STATUS === 'M' && !employee.SPOUSE_NAME) {
     throw Object.assign(new Error('Spouse name is required when marital status is Married.'), { status: 400 });

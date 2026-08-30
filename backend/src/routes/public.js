@@ -9,6 +9,7 @@ import {
 } from '../utils/phones.js';
 import { validateAndNormalizeEducation } from '../utils/education.js';
 import { normalizeAndValidateMeasurements } from '../utils/measurements.js';
+import { normalizeAndValidateEmployeeNids } from '../utils/nid.js';
 
 const router = Router();
 
@@ -52,6 +53,7 @@ function validateEmployee(e) {
 
   normalizeAndValidateEmployeePhones(e);
   normalizeAndValidateMeasurements(e);
+  normalizeAndValidateEmployeeNids(e);
 
   if (e.MARITAL_STATUS === 'M' && !e.SPOUSE_NAME) {
     throw Object.assign(new Error('Spouse name is required when marital status is Married.'), { status: 400 });
