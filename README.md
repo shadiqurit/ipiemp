@@ -261,6 +261,7 @@ Use the matching deployment files:
 - Windows physical server: `deploy/nginx/windows/ibnsina.shadiqur.bd.conf`
 - Linux VPS: `deploy/nginx/linux/ibnsina.shadiqur.bd.conf` and
   `deploy/systemd/ipi-employees.service`
+- PM2 on Windows or Linux: `ecosystem.config.js` and `PM2.md`
 
 On Windows, start the backend from `D:/ipiemp/backend` with `npm start` and
 register that command with your preferred Windows service manager so it starts
