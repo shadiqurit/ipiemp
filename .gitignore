@@ -14,6 +14,7 @@ backend/ca.pem
 # Vue / Vite build
 frontend/dist/
 dist/
+deploy/
 
 # Logs
 *.log
@@ -34,3 +35,6 @@ tmp/
 temp/
 .vercel
 .env*
+
+# Local production dump (contains employee data and password hashes)
+database/employee_portal_mysql.sql

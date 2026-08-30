@@ -171,7 +171,7 @@ npm run dev
 ```
 
 Open the URL printed by Vite (normally `http://localhost:5173`). The Vite dev
-server proxies `/api` requests to `http://localhost:3000`, so no frontend API
+server proxies `/api` requests to `http://localhost:3003`, so no frontend API
 environment variable is required for local development.
 
 ## Deploy to Vercel with Aiven MySQL
@@ -216,7 +216,86 @@ mysql -u root -p < database/schema.sql
 
 If you already have real data in the earlier MySQL schema, do not drop it. Create a migration script instead.
 
-### Education row numbering
+## Deploy to a physical server or VPS
+
+This repository serves both the public site and the admin pages from one Vue
+build. The production frontend directory is `frontend/dist`, and the Express
+API listens on port `3003` by default. Do not use `dist/admin` or port `5001`
+from a different project's Nginx configuration.
+
+Install and build the application:
+
+```bash
+cd backend
+npm ci --omit=dev
+
+cd ../frontend
+npm ci
+npm run build
+```
+
+Copy `backend/.env.example` to `backend/.env`, then set the production values.
+For Nginx running on the same machine, use at least:
+
+```dotenv
+HOST=127.0.0.1
+PORT=3003
+NODE_ENV=production
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=employee_portal_app
+DB_PASSWORD=REPLACE_WITH_A_STRONG_PASSWORD
+DB_NAME=employee_portal
+DB_SSL=false
+JWT_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
+FRONTEND_ORIGIN=https://ibnsina.shadiqur.bd
+```
+
+Import `database/schema.sql` only for a new empty database. The file
+`database/employee_portal_mysql.sql` is a data dump and will replace tables
+when imported; back up the database first and do not commit that dump because
+it contains real employee data.
+
+Use the matching deployment files:
+
+- Windows physical server: `deploy/nginx/windows/ibnsina.shadiqur.bd.conf`
+- Linux VPS: `deploy/nginx/linux/ibnsina.shadiqur.bd.conf` and
+  `deploy/systemd/ipi-employees.service`
+
+On Windows, start the backend from `D:/ipiemp/backend` with `npm start` and
+register that command with your preferred Windows service manager so it starts
+after reboot. Put the Windows server block inside the `http { ... }` section of
+`C:/nginx/conf/nginx.conf`, or include it from there. Validate and reload it
+from an Administrator terminal:
+
+```powershell
+C:\nginx\nginx.exe -t
+C:\nginx\nginx.exe -s reload
+```
+
+On Linux, make the deployed files readable by the service account, copy the
+systemd unit to
+`/etc/systemd/system/ipi-employees.service`, then run:
+
+```bash
+sudo chown -R www-data:www-data /var/www/ipiemp
+sudo systemctl daemon-reload
+sudo systemctl enable --now ipi-employees
+sudo systemctl status ipi-employees
+```
+
+After installing the appropriate Nginx file, validate and reload Nginx:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Verify the deployment with `https://ibnsina.shadiqur.bd`,
+`https://ibnsina.shadiqur.bd/admin`, and
+`https://ibnsina.shadiqur.bd/health`.
+
+## Existing database: education row numbering
 
 Education `SLNO` is numbered separately for each employee: every employee's
 first education row is `1`, then `2`, `3`, and so on. For an existing
