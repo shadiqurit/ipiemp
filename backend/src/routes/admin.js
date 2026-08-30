@@ -3,6 +3,9 @@ import bcrypt from 'bcryptjs';
 import ExcelJS from 'exceljs';
 import { pool } from '../db.js';
 import { requireAdmin, signAdmin } from '../auth.js';
+import { normalizeAndValidateEmployeePhones } from '../utils/phones.js';
+import { validateAndNormalizeEducation } from '../utils/education.js';
+import { normalizeAndValidateMeasurements } from '../utils/measurements.js';
 
 const router = Router();
 
@@ -18,11 +21,6 @@ const EMP_COLUMNS = [
   'GRNT_NATIONALITY','GRNT_PROFFESSION','GRNT_NID','GRNT_MOBILE'
 ];
 
-const EXAM_COLUMNS = [
-  'EXAMNAME','EXAMGROUP','BOARD','CLAS','PASSYEAR',
-  'REMARKS','INSTITUTE','SUBJECT_NAME'
-];
-
 function cleanObj(input, columns) {
   const result = {};
   for (const column of columns) {
@@ -33,8 +31,8 @@ function cleanObj(input, columns) {
 }
 
 function validateEmployee(employee) {
-  if (!employee.NAME || !employee.PHONE) {
-    throw Object.assign(new Error('Employee name and primary phone are required.'), { status: 400 });
+  if (!employee.NAME) {
+    throw Object.assign(new Error('Employee name is required.'), { status: 400 });
   }
 
   const allowed = {
@@ -47,6 +45,13 @@ function validateEmployee(employee) {
     if (!values.includes(employee[field] || '')) {
       throw Object.assign(new Error(`Invalid ${field} value.`), { status: 400 });
     }
+  }
+
+  normalizeAndValidateEmployeePhones(employee);
+  normalizeAndValidateMeasurements(employee);
+
+  if (employee.MARITAL_STATUS === 'M' && !employee.SPOUSE_NAME) {
+    throw Object.assign(new Error('Spouse name is required when marital status is Married.'), { status: 400 });
   }
 }
 
@@ -387,6 +392,13 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
     return next(e);
   }
 
+  let normalizedEducation;
+  try {
+    normalizedEducation = validateAndNormalizeEducation(education);
+  } catch (e) {
+    return next(e);
+  }
+
   const conn = await pool.getConnection();
 
   try {
@@ -458,10 +470,6 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
       `DELETE FROM hr_empexamdet WHERE EMP_ENTRY_ID = ?`,
       [empEntryId]
     );
-
-    const normalizedEducation = education
-      .map(row => cleanObj(row, EXAM_COLUMNS))
-      .filter(row => EXAM_COLUMNS.some(column => row[column]));
 
     for (const [index, row] of normalizedEducation.entries()) {
       await conn.execute(

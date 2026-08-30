@@ -2,6 +2,13 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db.js';
 import { getActiveBatch, getEmployeePermission } from '../services/access.js';
+import {
+  localPhoneDigits,
+  normalizeAndValidateEmployeePhones,
+  normalizePhone
+} from '../utils/phones.js';
+import { validateAndNormalizeEducation } from '../utils/education.js';
+import { normalizeAndValidateMeasurements } from '../utils/measurements.js';
 
 const router = Router();
 
@@ -17,20 +24,11 @@ const EMP_COLUMNS = [
   'GRNT_NATIONALITY','GRNT_PROFFESSION','GRNT_NID','GRNT_MOBILE'
 ];
 
-const EXAM_COLUMNS = [
-  'EXAMNAME','EXAMGROUP','BOARD','CLAS','PASSYEAR',
-  'REMARKS','INSTITUTE','SUBJECT_NAME'
-];
-
 const allowed = {
   GENDER: ['', 'M', 'F'],
   RELIGION: ['', 'I', 'H', 'B', 'C'],
   MARITAL_STATUS: ['', 'U', 'M']
 };
-
-function normalizedPhone(value) {
-  return String(value || '').replace(/\s+/g, '').trim();
-}
 
 function cleanObj(input, columns) {
   const out = {};
@@ -46,14 +44,17 @@ function validateEmployee(e) {
     throw Object.assign(new Error('Employee name is required.'), { status: 400 });
   }
 
-  if (!e.PHONE) {
-    throw Object.assign(new Error('Phone number is required.'), { status: 400 });
-  }
-
   for (const key of Object.keys(allowed)) {
     if (!allowed[key].includes(e[key] || '')) {
       throw Object.assign(new Error(`Invalid ${key} value.`), { status: 400 });
     }
+  }
+
+  normalizeAndValidateEmployeePhones(e);
+  normalizeAndValidateMeasurements(e);
+
+  if (e.MARITAL_STATUS === 'M' && !e.SPOUSE_NAME) {
+    throw Object.assign(new Error('Spouse name is required when marital status is Married.'), { status: 400 });
   }
 }
 
@@ -63,12 +64,12 @@ async function getVerifiedEmployee(conn, meritlistId, classId, phone, lock = fal
        FROM up_emp
       WHERE MERITLIST_ID = ?
         AND CLASS_ID = ?
-        AND REPLACE(PHONE, ' ', '') = ?
+        AND RIGHT(REPLACE(REPLACE(PHONE, ' ', ''), '+', ''), 11) = ?
       LIMIT 1` + (lock ? ' FOR UPDATE' : '');
 
   const [rows] = await conn.execute(
     sql,
-    [meritlistId, classId, normalizedPhone(phone)]
+    [meritlistId, classId, localPhoneDigits(phone)]
   );
 
   return rows[0] || null;
@@ -118,11 +119,17 @@ router.get('/app-state', async (req, res, next) => {
 router.post('/employee/lookup', async (req, res, next) => {
   const meritlistId = String(req.body?.meritlistId || '').trim();
   const classId = String(req.body?.classId || '').trim();
-  const phone = normalizedPhone(req.body?.phone);
+  const phone = normalizePhone(req.body?.phone);
 
   if (!meritlistId || !classId || !phone) {
     return res.status(400).json({
       message: 'Merit List ID, Class ID and Phone Number are required.'
+    });
+  }
+
+  if (!localPhoneDigits(phone)) {
+    return res.status(400).json({
+      message: 'Phone Number must be 11 digits and start with 013, 014, 015, 016, 017, 018 or 019.'
     });
   }
 
@@ -255,7 +262,7 @@ router.post('/employee/save', async (req, res, next) => {
   const identity = {
     meritlistId: String(req.body?.identity?.meritlistId || '').trim(),
     classId: String(req.body?.identity?.classId || '').trim(),
-    phone: normalizedPhone(req.body?.identity?.phone)
+    phone: normalizePhone(req.body?.identity?.phone)
   };
 
   if (!identity.meritlistId || !identity.classId || (!newEntry && !identity.phone)) {
@@ -266,17 +273,29 @@ router.post('/employee/save', async (req, res, next) => {
     });
   }
 
-  const employee = cleanObj(req.body?.employee, EMP_COLUMNS);
-  employee.PHONE = normalizedPhone(employee.PHONE || identity.phone);
 
-  const education = Array.isArray(req.body?.education)
-    ? req.body.education
-    : [];
+  if (!newEntry && !localPhoneDigits(identity.phone)) {
+    return res.status(400).json({
+      message: 'Phone Number must be 11 digits and start with 013, 014, 015, 016, 017, 018 or 019.'
+    });
+  }
+
+  const employee = cleanObj(req.body?.employee, EMP_COLUMNS);
+  employee.PHONE = normalizePhone(employee.PHONE || identity.phone);
+
+  const education = Array.isArray(req.body?.education) ? req.body.education : [];
 
   validateEmployee(employee);
 
+  let normalizedEducation;
+  try {
+    normalizedEducation = validateAndNormalizeEducation(education);
+  } catch (e) {
+    return next(e);
+  }
+
   // Existing employees cannot change the phone used for verification.
-  if (!newEntry && normalizedPhone(employee.PHONE) !== identity.phone) {
+  if (!newEntry && normalizePhone(employee.PHONE) !== identity.phone) {
     return res.status(400).json({
       message: 'Primary phone cannot be changed in this session.'
     });
@@ -383,7 +402,7 @@ router.post('/employee/save', async (req, res, next) => {
         );
       }
 
-      const updateCols = EMP_COLUMNS.filter(c => c !== 'PHONE');
+      const updateCols = EMP_COLUMNS;
       const setSql = updateCols.map(c => `${c} = ?`).join(',');
 
       await conn.execute(
@@ -403,10 +422,6 @@ router.post('/employee/save', async (req, res, next) => {
         [current.EMP_ENTRY_ID]
       );
     }
-
-    const normalizedEducation = education
-      .map(x => cleanObj(x, EXAM_COLUMNS))
-      .filter(x => EXAM_COLUMNS.some(c => x[c]));
 
     for (const [index, row] of normalizedEducation.entries()) {
       await conn.execute(
@@ -452,12 +467,19 @@ router.post('/employee/save', async (req, res, next) => {
 router.post('/employee/update-request', async (req, res, next) => {
   const meritlistId = String(req.body?.meritlistId || '').trim();
   const classId = String(req.body?.classId || '').trim();
-  const phone = normalizedPhone(req.body?.phone);
+  const phone = normalizePhone(req.body?.phone);
   const note = String(req.body?.note || '').trim();
 
   if (!meritlistId || !classId || !phone) {
     return res.status(400).json({
       message: 'Merit List ID, Class ID and Phone Number are required.'
+    });
+  }
+
+
+  if (!localPhoneDigits(phone)) {
+    return res.status(400).json({
+      message: 'Phone Number must be 11 digits and start with 013, 014, 015, 016, 017, 018 or 019.'
     });
   }
 

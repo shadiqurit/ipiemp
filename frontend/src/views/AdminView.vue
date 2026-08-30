@@ -3,7 +3,12 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { api, setAdminToken } from '../api';
 import AutoCompleteSelect from '../components/AutoCompleteSelect.vue';
 import DateInput from '../components/DateInput.vue';
+import PhoneInput from '../components/PhoneInput.vue';
+import EducationLevels from '../components/EducationLevels.vue';
+import HeightInput from '../components/HeightInput.vue';
+import WeightInput from '../components/WeightInput.vue';
 import { formatDateTime } from '../utils/dates';
+import { normalizeEducationRows } from '../utils/education';
 import { t } from '../i18n';
 
 const token = ref(localStorage.getItem('admin_token') || '');
@@ -52,14 +57,13 @@ const employeeFields = [
   ['GRNT_NID', 'Guarantor NID'], ['GRNT_MOBILE', 'Guarantor Mobile']
 ];
 
-const educationFields = [
-  ['EXAMNAME', 'Exam Name'], ['EXAMGROUP', 'Group'], ['BOARD', 'Board / University'],
-  ['CLAS', 'Class / Result'], ['PASSYEAR', 'Pass Year'], ['SUBJECT_NAME', 'Subject'],
-  ['INSTITUTE', 'Institute'], ['REMARKS', 'Remarks']
-];
-
-function blankEducation() {
-  return { EXAMNAME: '', EXAMGROUP: '', BOARD: '', CLAS: '', PASSYEAR: '', REMARKS: '', INSTITUTE: '', SUBJECT_NAME: '' };
+function onEditMaritalStatusChange() {
+  if (editEmployee.MARITAL_STATUS !== 'M') {
+    editEmployee.SPOUSE_NAME = '';
+    editEmployee.SPOSE_OCCUPATION = '';
+    editEmployee.SPOUSE_PHONE = '';
+    editEmployee.SPOSE_MARRIAGE_DATE = '';
+  }
 }
 
 if (token.value) setAdminToken(token.value);
@@ -180,9 +184,7 @@ async function openEmployeeEditor(employee) {
     Object.assign(editEmployee, data.employee);
     editBatch.value = data.employee.batch_no;
     editApprovalStatus.value = data.employee.APPROVAL_STATUS;
-    editEducation.value = data.education.length
-      ? data.education.map(row => ({ ...blankEducation(), ...row }))
-      : [blankEducation()];
+    editEducation.value = normalizeEducationRows(data.education);
     selectedEmployeeId.value = employee.EMP_ENTRY_ID;
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
@@ -370,11 +372,17 @@ onMounted(refresh);
             <div class="field"><label>{{ t('Birth Date') }}</label><DateInput v-model="editEmployee.BIRTHDATE" /></div>
             <div class="field"><label>{{ t('Blood Group') }}</label><input v-model="editEmployee.BLD_GROUP" /></div>
             <div class="field"><label>{{ t('Nationality') }}</label><input v-model="editEmployee.NATIONALITY" /></div>
-            <div class="field"><label>{{ t('Height') }}</label><input v-model="editEmployee.HEIGHT" /></div>
-            <div class="field"><label>{{ t('Weight') }}</label><input v-model="editEmployee.WEIGHT" /></div>
+            <div class="field"><label>{{ t('Height') }}</label><HeightInput v-model="editEmployee.HEIGHT" /></div>
+            <div class="field"><label>{{ t('Weight (kg)') }}</label><WeightInput v-model="editEmployee.WEIGHT" /></div>
             <div class="field"><label>{{ t('Gender') }}</label><select v-model="editEmployee.GENDER"><option value="">Select</option><option value="M">{{ t('Male') }}</option><option value="F">{{ t('Female') }}</option></select></div>
             <div class="field"><label>{{ t('Religion') }}</label><select v-model="editEmployee.RELIGION"><option value="">Select</option><option value="I">{{ t('Islam') }}</option><option value="H">{{ t('Hindu') }}</option><option value="B">{{ t('Buddha') }}</option><option value="C">{{ t('Christian') }}</option></select></div>
-            <div class="field"><label>{{ t('Marital Status') }}</label><select v-model="editEmployee.MARITAL_STATUS"><option value="">Select</option><option value="U">{{ t('Unmarried') }}</option><option value="M">{{ t('Married') }}</option></select></div>
+            <div class="field"><label>{{ t('Marital Status') }}</label><select v-model="editEmployee.MARITAL_STATUS" @change="onEditMaritalStatusChange"><option value="">Select</option><option value="U">{{ t('Unmarried') }}</option><option value="M">{{ t('Married') }}</option></select></div>
+            <template v-if="editEmployee.MARITAL_STATUS === 'M'">
+              <div class="field"><label>{{ t('Spouse Name') }} *</label><input v-model="editEmployee.SPOUSE_NAME" required /></div>
+              <div class="field"><label>{{ t('Spouse Occupation') }}</label><input v-model="editEmployee.SPOSE_OCCUPATION" /></div>
+              <div class="field"><label>{{ t('Spouse Phone') }} *</label><PhoneInput v-model="editEmployee.SPOUSE_PHONE" /></div>
+              <div class="field"><label>{{ t('Marriage Date') }}</label><DateInput v-model="editEmployee.SPOSE_MARRIAGE_DATE" /></div>
+            </template>
           </div>
         </section>
 
@@ -382,8 +390,8 @@ onMounted(refresh);
           <h2>{{ t('Contact & Identity') }}</h2>
           <div class="grid">
             <div class="field"><label>{{ t('Email') }}</label><input v-model="editEmployee.EMAIL" type="email" /></div>
-            <div class="field"><label>{{ t('Primary Phone') }}</label><input v-model="editEmployee.PHONE" /></div>
-            <div class="field"><label>{{ t('Alternate Phone') }}</label><input v-model="editEmployee.PHONE1" /></div>
+            <div class="field"><label>{{ t('Primary Phone') }} *</label><PhoneInput v-model="editEmployee.PHONE" autocomplete="tel" /></div>
+            <div class="field"><label>{{ t('Alternate Phone') }} *</label><PhoneInput v-model="editEmployee.PHONE1" /></div>
             <div class="field"><label>{{ t('NID') }}</label><input v-model="editEmployee.NID" /></div>
           </div>
         </section>
@@ -413,22 +421,18 @@ onMounted(refresh);
           <div class="grid">
             <div class="field"><label>{{ t('Emergency Person') }}</label><input v-model="editEmployee.EMGRCNY_PERSON" /></div>
             <div class="field"><label>{{ t('Relationship') }}</label><input v-model="editEmployee.EMGRCNY_RELATION" /></div>
-            <div class="field"><label>{{ t('Emergency Phone') }}</label><input v-model="editEmployee.EMGRCNY_PHONE" /></div>
+            <div class="field"><label>{{ t('Emergency Phone') }} *</label><PhoneInput v-model="editEmployee.EMGRCNY_PHONE" /></div>
             <div class="field"><label>{{ t('Emergency Address') }}</label><input v-model="editEmployee.EMGRCNY_ADDRESS" /></div>
           </div>
         </section>
 
         <section class="card">
-          <h2>{{ t('Family & Spouse') }}</h2>
+          <h2>{{ t('Family Information') }}</h2>
           <div class="grid">
             <div class="field"><label>{{ t('Father Name') }}</label><input v-model="editEmployee.FATHER_NAME" /></div>
-            <div class="field"><label>{{ t('Father Phone') }}</label><input v-model="editEmployee.FATHER_PHONE" /></div>
+            <div class="field"><label>{{ t('Father Phone') }} *</label><PhoneInput v-model="editEmployee.FATHER_PHONE" /></div>
             <div class="field"><label>{{ t('Mother Name') }}</label><input v-model="editEmployee.MOTHER_NAME" /></div>
-            <div class="field"><label>{{ t('Mother Phone') }}</label><input v-model="editEmployee.MOTHER_PHONE" /></div>
-            <div class="field"><label>{{ t('Spouse Name') }}</label><input v-model="editEmployee.SPOUSE_NAME" /></div>
-            <div class="field"><label>{{ t('Marriage Date') }}</label><DateInput v-model="editEmployee.SPOSE_MARRIAGE_DATE" /></div>
-            <div class="field"><label>{{ t('Spouse Occupation') }}</label><input v-model="editEmployee.SPOSE_OCCUPATION" /></div>
-            <div class="field"><label>{{ t('Spouse Phone') }}</label><input v-model="editEmployee.SPOUSE_PHONE" /></div>
+            <div class="field"><label>{{ t('Mother Phone') }} *</label><PhoneInput v-model="editEmployee.MOTHER_PHONE" /></div>
           </div>
         </section>
 
@@ -443,16 +447,14 @@ onMounted(refresh);
             <div class="field"><label>{{ t('Nationality') }}</label><input v-model="editEmployee.GRNT_NATIONALITY" /></div>
             <div class="field"><label>{{ t('Profession') }}</label><input v-model="editEmployee.GRNT_PROFFESSION" /></div>
             <div class="field"><label>{{ t('NID') }}</label><input v-model="editEmployee.GRNT_NID" /></div>
-            <div class="field"><label>{{ t('Mobile') }}</label><input v-model="editEmployee.GRNT_MOBILE" /></div>
+            <div class="field"><label>{{ t('Mobile') }} *</label><PhoneInput v-model="editEmployee.GRNT_MOBILE" /></div>
           </div>
         </section>
 
         <section class="card">
-          <div class="section-title"><h2>{{ t('Education') }}</h2><button type="button" @click="editEducation.push(blankEducation())">{{ t('+ Add Education') }}</button></div>
-          <div v-for="(education, index) in editEducation" :key="index" class="edu">
-            <div class="section-title"><b>{{ t('Education') }} #{{ index + 1 }}</b><button v-if="editEducation.length > 1" type="button" class="danger" @click="editEducation.splice(index, 1)">{{ t('Remove') }}</button></div>
-            <div class="grid"><div v-for="[key, label] in educationFields" :key="key" class="field"><label>{{ t(label) }}</label><input v-model="education[key]" /></div></div>
-          </div>
+          <div class="section-title"><h2>{{ t('Education') }}</h2></div>
+          <p class="muted">{{ t('Levels 1–3 are required. Level 4 is optional.') }}</p>
+          <EducationLevels v-model="editEducation" />
         </section>
 
         <section class="sticky-actions"><button type="button" @click="closeEmployeeEditor">{{ t('Cancel') }}</button><button class="primary" type="submit" :disabled="editLoading">{{ t(editLoading ? 'Saving…' : 'Save Employee Changes') }}</button></section>

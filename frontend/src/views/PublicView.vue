@@ -1,17 +1,14 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { api } from '../api';
-import AutoCompleteSelect from '../components/AutoCompleteSelect.vue';
 import DateInput from '../components/DateInput.vue';
+import PhoneInput from '../components/PhoneInput.vue';
+import EducationLevels from '../components/EducationLevels.vue';
+import HeightInput from '../components/HeightInput.vue';
+import WeightInput from '../components/WeightInput.vue';
 import { formatDateTime } from '../utils/dates';
+import { normalizeEducationRows } from '../utils/education';
 import { t } from '../i18n';
-
-const EXAMS = [
-  'Class Five','Class Eight','JSC/JDC','SSC / Dakhil','HSC / Alim','Diploma',
-  'Fazil','Kamil','BA','MA','BBA','MBA','B.Com','M.Com','BBS','MBS','BSS',
-  'MSS','B.Sc','M.Sc','B.Pharm','M.Pharm','B.Ed','M.Ed','LLB','LLM','MBBS',
-  'BAMS','BHMS','BUMS','M.Phil','Ph.D','CA','FCA','CMA / ACMA','PGD','Others'
-];
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const GENDER_OPTIONS = [{ value: 'M', label: 'Male' }, { value: 'F', label: 'Female' }];
@@ -20,7 +17,6 @@ const RELIGION_OPTIONS = [
   { value: 'B', label: 'Buddha' }, { value: 'C', label: 'Christian' }
 ];
 const MARITAL_STATUS_OPTIONS = [{ value: 'U', label: 'Unmarried' }, { value: 'M', label: 'Married' }];
-const examOptions = computed(() => EXAMS.map(value => ({ value, label: t(value) })));
 
 const state = ref({ collectionOpen:false, activeBatch:null });
 
@@ -68,7 +64,7 @@ const editable = computed(() => ['NEW','EDIT'].includes(mode.value));
 
 const basicFields = [
   ['NAME','Employee Name'],['BIRTHDATE','Birth Date','date'],['BLD_GROUP','Blood Group'],
-  ['NATIONALITY','Nationality'],['HEIGHT','Height'],['WEIGHT','Weight']
+  ['NATIONALITY','Nationality'],['HEIGHT','Height'],['WEIGHT','Weight (kg)']
 ];
 
 const contactFields = [
@@ -82,9 +78,7 @@ const emergencyFields = [
 
 const familyFields = [
   ['FATHER_NAME','Father Name'],['FATHER_PHONE','Father Phone'],['MOTHER_NAME','Mother Name'],
-  ['MOTHER_PHONE','Mother Phone'],['SPOUSE_NAME','Spouse Name'],
-  ['SPOSE_MARRIAGE_DATE','Marriage Date','date'],['SPOSE_OCCUPATION','Spouse Occupation'],
-  ['SPOUSE_PHONE','Spouse Phone']
+  ['MOTHER_PHONE','Mother Phone']
 ];
 
 const guarantorFields = [
@@ -94,16 +88,9 @@ const guarantorFields = [
   ['GRNT_NID','NID'],['GRNT_MOBILE','Mobile']
 ];
 
-function blankEducation() {
-  return {
-    EXAMNAME:'',EXAMGROUP:'',BOARD:'',CLAS:'',
-    PASSYEAR:'',REMARKS:'',INSTITUTE:'',SUBJECT_NAME:''
-  };
-}
-
 function resetEmployee() {
   Object.keys(employee).forEach(k => employee[k] = '');
-  education.value = [blankEducation()];
+  education.value = normalizeEducationRows();
   batchNo.value = '';
   assignedIpi.value = '';
   sameAddress.value = false;
@@ -122,6 +109,15 @@ function toggleSame() {
 
 function onPermanentInput() {
   if (sameAddress.value) copyPermanent();
+}
+
+function onMaritalStatusChange() {
+  if (employee.MARITAL_STATUS !== 'M') {
+    employee.SPOUSE_NAME = '';
+    employee.SPOSE_OCCUPATION = '';
+    employee.SPOUSE_PHONE = '';
+    employee.SPOSE_MARRIAGE_DATE = '';
+  }
 }
 
 async function revealForm(focusFirstField = false) {
@@ -176,9 +172,7 @@ async function lookup() {
     batchNo.value = data.batchNo || '';
     assignedIpi.value = data.employee.IPI || '';
 
-    education.value = data.education?.length
-      ? data.education.map(x => ({ ...blankEducation(), ...x }))
-      : [blankEducation()];
+    education.value = normalizeEducationRows(data.education);
 
     mode.value = data.canEdit ? 'EDIT' : 'VIEW';
     canRequestUpdate.value = !!data.canRequestUpdate;
@@ -322,7 +316,7 @@ function startOver() {
 }
 
 onMounted(async () => {
-  education.value = [blankEducation()];
+  education.value = normalizeEducationRows();
   await loadState();
 });
 </script>
@@ -371,13 +365,11 @@ onMounted(async () => {
 
           <div class="field">
             <label>{{ t('Phone Number') }}</label>
-            <input
+            <PhoneInput
               v-model="credentials.phone"
-              type="tel"
-              inputmode="tel"
               autocomplete="tel"
               :placeholder="t('Enter primary phone')"
-              @keyup.enter="lookup"
+              @enter="lookup"
             />
           </div>
         </div>
@@ -433,7 +425,7 @@ onMounted(async () => {
         <a href="#contact">03 {{ t('Contact & Identity') }}</a>
         <a href="#address">04 {{ t('Address Information') }}</a>
         <a href="#emergency">05 {{ t('Emergency Contact') }}</a>
-        <a href="#family">06 {{ t('Family & Spouse') }}</a>
+        <a href="#family">06 {{ t('Family Information') }}</a>
         <a href="#guarantor">07 {{ t('Guarantor Information') }}</a>
         <a href="#education">08 {{ t('Education') }}</a>
       </nav>
@@ -479,6 +471,8 @@ onMounted(async () => {
             <label>{{ t(label) }}<span v-if="key === 'NAME'" class="required-mark"> *</span></label>
             <select v-if="key === 'BLD_GROUP'" v-model="employee[key]" :disabled="!editable"><option value="">{{ t('Select') }}</option><option v-for="group in BLOOD_GROUPS" :key="group" :value="group">{{ group }}</option></select>
             <DateInput v-else-if="type === 'date'" v-model="employee[key]" :disabled="!editable" />
+            <HeightInput v-else-if="key === 'HEIGHT'" v-model="employee.HEIGHT" :disabled="!editable" />
+            <WeightInput v-else-if="key === 'WEIGHT'" v-model="employee.WEIGHT" :disabled="!editable" />
             <input v-else v-model="employee[key]" :type="type || 'text'" :disabled="!editable" :required="key === 'NAME'" :autocomplete="key === 'NAME' ? 'name' : 'off'" />
           </div>
 
@@ -494,8 +488,15 @@ onMounted(async () => {
 
           <div class="field">
             <label>{{ t('Marital Status') }}</label>
-            <select v-model="employee.MARITAL_STATUS" :disabled="!editable"><option value="">{{ t('Select') }}</option><option v-for="option in MARITAL_STATUS_OPTIONS" :key="option.value" :value="option.value">{{ t(option.label) }}</option></select>
+            <select v-model="employee.MARITAL_STATUS" :disabled="!editable" @change="onMaritalStatusChange"><option value="">{{ t('Select') }}</option><option v-for="option in MARITAL_STATUS_OPTIONS" :key="option.value" :value="option.value">{{ t(option.label) }}</option></select>
           </div>
+
+          <template v-if="employee.MARITAL_STATUS === 'M'">
+            <div class="field"><label>{{ t('Spouse Name') }}<span class="required-mark"> *</span></label><input v-model="employee.SPOUSE_NAME" :disabled="!editable" required /></div>
+            <div class="field"><label>{{ t('Spouse Occupation') }}</label><input v-model="employee.SPOSE_OCCUPATION" :disabled="!editable" /></div>
+            <div class="field"><label>{{ t('Spouse Phone') }}<span class="required-mark"> *</span></label><PhoneInput v-model="employee.SPOUSE_PHONE" :disabled="!editable" /></div>
+            <div class="field"><label>{{ t('Marriage Date') }}</label><DateInput v-model="employee.SPOSE_MARRIAGE_DATE" :disabled="!editable" /></div>
+          </template>
         </div>
       </section>
 
@@ -508,15 +509,14 @@ onMounted(async () => {
             :key="key"
             class="field"
           >
-            <label>{{ t(label) }}<span v-if="key === 'PHONE'" class="required-mark"> *</span></label>
-            <input
+            <label>{{ t(label) }}<span v-if="key.includes('PHONE')" class="required-mark"> *</span></label>
+            <PhoneInput
+              v-if="key.includes('PHONE')"
               v-model="employee[key]"
-              :type="type || (key.includes('PHONE') ? 'tel' : 'text')"
-              :inputmode="key.includes('PHONE') ? 'tel' : undefined"
-              :autocomplete="key === 'EMAIL' ? 'email' : key === 'PHONE' ? 'tel' : 'off'"
-              :required="key === 'PHONE'"
               :disabled="!editable || (key === 'PHONE' && mode !== 'NEW')"
+              :autocomplete="key === 'PHONE' ? 'tel' : 'off'"
             />
+            <input v-else v-model="employee[key]" :type="type || 'text'" :autocomplete="key === 'EMAIL' ? 'email' : 'off'" :disabled="!editable" />
           </div>
         </div>
 
@@ -618,14 +618,15 @@ onMounted(async () => {
             :key="key"
             class="field"
           >
-            <label>{{ t(label) }}</label>
-            <input v-model="employee[key]" :type="key.includes('PHONE') ? 'tel' : 'text'" :inputmode="key.includes('PHONE') ? 'tel' : undefined" :disabled="!editable" />
+            <label>{{ t(label) }}<span v-if="key.includes('PHONE')" class="required-mark"> *</span></label>
+            <PhoneInput v-if="key.includes('PHONE')" v-model="employee[key]" :disabled="!editable" />
+            <input v-else v-model="employee[key]" :disabled="!editable" />
           </div>
         </div>
       </section>
 
       <section id="family" class="card">
-        <h2 data-step="06">{{ t('Family & Spouse') }}</h2>
+        <h2 data-step="06">{{ t('Family Information') }}</h2>
 
         <div class="grid">
           <div
@@ -633,13 +634,14 @@ onMounted(async () => {
             :key="key"
             class="field"
           >
-            <label>{{ t(label) }}</label>
-            <input
+            <label>{{ t(label) }}<span v-if="key.includes('PHONE')" class="required-mark"> *</span></label>
+            <PhoneInput
+              v-if="key.includes('PHONE')"
               v-model="employee[key]"
-              :type="type || (key.includes('PHONE') ? 'tel' : 'text')"
-              :inputmode="key.includes('PHONE') ? 'tel' : undefined"
               :disabled="!editable"
             />
+            <DateInput v-else-if="type === 'date'" v-model="employee[key]" :disabled="!editable" />
+            <input v-else v-model="employee[key]" :disabled="!editable" />
           </div>
         </div>
       </section>
@@ -653,86 +655,17 @@ onMounted(async () => {
             :key="key"
             class="field"
           >
-            <label>{{ t(label) }}</label>
-            <input v-model="employee[key]" :type="key === 'GRNT_MOBILE' ? 'tel' : 'text'" :inputmode="key === 'GRNT_MOBILE' ? 'tel' : undefined" :disabled="!editable" />
+            <label>{{ t(label) }}<span v-if="key === 'GRNT_MOBILE'" class="required-mark"> *</span></label>
+            <PhoneInput v-if="key === 'GRNT_MOBILE'" v-model="employee[key]" :disabled="!editable" />
+            <input v-else v-model="employee[key]" :disabled="!editable" />
           </div>
         </div>
       </section>
 
       <section id="education" class="card">
-        <div class="section-title">
-          <h2 data-step="08">{{ t('Education') }}</h2>
-
-          <button
-            v-if="editable"
-            type="button"
-            @click="education.push(blankEducation())"
-          >
-            {{ t('+ Add Education') }}
-          </button>
-        </div>
-
-        <div
-          v-for="(edu,i) in education"
-          :key="i"
-          class="edu"
-        >
-          <div class="section-title">
-            <b>{{ t('Education') }} #{{ i+1 }}</b>
-
-            <button
-              v-if="editable && education.length > 1"
-              type="button"
-              class="danger"
-              @click="education.splice(i,1)"
-            >
-              {{ t('Remove') }}
-            </button>
-          </div>
-
-          <div class="grid">
-            <div class="field">
-              <label>{{ t('Exam Name') }}</label>
-
-              <AutoCompleteSelect v-model="edu.EXAMNAME" :options="examOptions" :disabled="!editable" :placeholder="t('Search exam name')" />
-            </div>
-
-            <div class="field">
-              <label>{{ t('Group') }}</label>
-              <input v-model="edu.EXAMGROUP" :disabled="!editable" />
-            </div>
-
-            <div class="field">
-              <label>{{ t('Board / University') }}</label>
-              <input v-model="edu.BOARD" :disabled="!editable" />
-            </div>
-
-            <div class="field">
-              <label>{{ t('Class / Result') }}</label>
-              <input v-model="edu.CLAS" :disabled="!editable" />
-            </div>
-
-            <div class="field">
-              <label>{{ t('Pass Year') }}</label>
-              <input v-model="edu.PASSYEAR" inputmode="numeric" :disabled="!editable" />
-            </div>
-
-            <div class="field">
-              <label>{{ t('Subject') }}</label>
-              <input v-model="edu.SUBJECT_NAME" :disabled="!editable" />
-            </div>
-
-            <div class="field">
-              <label>{{ t('Institute') }}</label>
-              <input v-model="edu.INSTITUTE" :disabled="!editable" />
-            </div>
-
-            <div class="field">
-              <label>{{ t('Remarks') }}</label>
-              <input v-model="edu.REMARKS" :disabled="!editable" />
-            </div>
-          </div>
-        </div>
+        <div class="section-title"><h2 data-step="08">{{ t('Education') }}</h2></div>
+        <p class="muted">{{ t('Levels 1–3 are required. Level 4 is optional.') }}</p>
+        <EducationLevels v-model="education" :disabled="!editable" />
       </section>
 
       <section class="sticky-actions">
