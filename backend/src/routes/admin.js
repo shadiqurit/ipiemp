@@ -31,8 +31,8 @@ function cleanObj(input, columns) {
   return result;
 }
 
-function validateEmployee(employee) {
-  if (!employee.NAME) {
+function validateEmployee(employee, { required = false } = {}) {
+  if (required && !employee.NAME) {
     throw Object.assign(new Error('Employee name is required.'), { status: 400 });
   }
 
@@ -48,11 +48,11 @@ function validateEmployee(employee) {
     }
   }
 
-  normalizeAndValidateEmployeePhones(employee);
-  normalizeAndValidateMeasurements(employee);
-  normalizeAndValidateEmployeeNids(employee);
+  normalizeAndValidateEmployeePhones(employee, { required });
+  normalizeAndValidateMeasurements(employee, { required });
+  normalizeAndValidateEmployeeNids(employee, { required });
 
-  if (employee.MARITAL_STATUS === 'M' && !employee.SPOUSE_NAME) {
+  if (required && employee.MARITAL_STATUS === 'M' && !employee.SPOUSE_NAME) {
     throw Object.assign(new Error('Spouse name is required when marital status is Married.'), { status: 400 });
   }
 }
@@ -384,19 +384,21 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
     });
   }
 
-  if (!['PENDING', 'APPROVED', 'REJECTED'].includes(approvalStatus)) {
+  if (!['DRAFT', 'PENDING', 'APPROVED', 'REJECTED'].includes(approvalStatus)) {
     return res.status(400).json({ message: 'Invalid approval status.' });
   }
 
+  const requireComplete = approvalStatus === 'APPROVED';
+
   try {
-    validateEmployee(employee);
+    validateEmployee(employee, { required: requireComplete });
   } catch (e) {
     return next(e);
   }
 
   let normalizedEducation;
   try {
-    normalizedEducation = validateAndNormalizeEducation(education);
+    normalizedEducation = validateAndNormalizeEducation(education, { required: requireComplete });
   } catch (e) {
     return next(e);
   }
@@ -407,12 +409,26 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
     await conn.beginTransaction();
 
     const [existing] = await conn.execute(
-      `SELECT EMP_ENTRY_ID FROM up_emp WHERE EMP_ENTRY_ID = ? FOR UPDATE`,
+      `SELECT EMP_ENTRY_ID, APPROVAL_STATUS FROM up_emp WHERE EMP_ENTRY_ID = ? FOR UPDATE`,
       [empEntryId]
     );
 
     if (!existing[0]) {
       throw Object.assign(new Error('Employee record not found.'), { status: 404 });
+    }
+
+    if (existing[0].APPROVAL_STATUS === 'DRAFT' && approvalStatus !== 'DRAFT') {
+      throw Object.assign(
+        new Error('This employee entry is still a draft. The employee must submit it before its approval status can be changed.'),
+        { status: 409 }
+      );
+    }
+
+    if (existing[0].APPROVAL_STATUS !== 'DRAFT' && approvalStatus === 'DRAFT') {
+      throw Object.assign(
+        new Error('A submitted employee entry cannot be changed back to draft.'),
+        { status: 409 }
+      );
     }
 
     const [batch] = await conn.execute(
@@ -426,12 +442,13 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
 
     const [duplicateIdentity] = await conn.execute(
       `SELECT EMP_ENTRY_ID FROM up_emp
-        WHERE MERITLIST_ID = ? AND CLASS_ID = ? AND EMP_ENTRY_ID <> ? LIMIT 1`,
-      [meritlistId, classId, empEntryId]
+        WHERE batch_no = ? AND MERITLIST_ID = ? AND CLASS_ID = ?
+          AND EMP_ENTRY_ID <> ? LIMIT 1`,
+      [batchNo, meritlistId, classId, empEntryId]
     );
 
     if (duplicateIdentity[0]) {
-      throw Object.assign(new Error('Merit List ID and Class ID are already used by another employee.'), { status: 409 });
+      throw Object.assign(new Error(`Merit List ID and Class ID are already used by another employee in batch ${batchNo}.`), { status: 409 });
     }
 
     if (ipi) {
@@ -446,7 +463,7 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
     }
 
     const setColumns = EMP_COLUMNS.map(column => `${column} = ?`).join(', ');
-    const approvalAudit = approvalStatus === 'PENDING'
+    const approvalAudit = ['DRAFT', 'PENDING'].includes(approvalStatus)
       ? [null, null]
       : [req.admin.username, new Date()];
 
@@ -499,6 +516,12 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
     res.json({ ok: true, message: 'Employee details updated.' });
   } catch (e) {
     await conn.rollback();
+    if (e.code === 'ER_DUP_ENTRY') {
+      e.status = 409;
+      e.message = String(e.message).includes('UK_EMP_IPI')
+        ? 'This IPI is already assigned to another employee.'
+        : `Merit List ID and Class ID are already used by another employee in batch ${batchNo}.`;
+    }
     next(e);
   } finally {
     conn.release();
@@ -519,8 +542,42 @@ router.patch('/employees/:empEntryId/approval', async (req, res, next) => {
     });
   }
 
+  const conn = await pool.getConnection();
+
   try {
-    const [result] = await pool.execute(
+    await conn.beginTransaction();
+
+    const [employees] = await conn.execute(
+      `SELECT * FROM up_emp WHERE EMP_ENTRY_ID = ? FOR UPDATE`,
+      [empEntryId]
+    );
+
+    if (!employees[0]) {
+      throw Object.assign(new Error('Employee record not found.'), { status: 404 });
+    }
+
+    if (employees[0].APPROVAL_STATUS === 'DRAFT') {
+      throw Object.assign(
+        new Error('This employee entry is still a draft. The employee must submit the completed form before an administrator can approve it.'),
+        { status: 409 }
+      );
+    }
+
+    if (approvalStatus === 'APPROVED') {
+      const [education] = await conn.execute(
+        `SELECT EXAMNAME, EXAMGROUP, BOARD, CLAS, PASSYEAR,
+                REMARKS, INSTITUTE, SUBJECT_NAME
+           FROM hr_empexamdet
+          WHERE EMP_ENTRY_ID = ?
+          ORDER BY SLNO`,
+        [empEntryId]
+      );
+
+      validateEmployee(employees[0], { required: true });
+      validateAndNormalizeEducation(education, { required: true });
+    }
+
+    await conn.execute(
       `UPDATE up_emp
           SET APPROVAL_STATUS = ?,
               APPROVED_BY = ?,
@@ -530,13 +587,13 @@ router.patch('/employees/:empEntryId/approval', async (req, res, next) => {
       [approvalStatus, req.admin.username, empEntryId]
     );
 
-    if (!result.affectedRows) {
-      return res.status(404).json({ message: 'Employee record not found.' });
-    }
-
+    await conn.commit();
     res.json({ ok: true, message: `Employee ${approvalStatus.toLowerCase()}.` });
   } catch (e) {
+    await conn.rollback();
     next(e);
+  } finally {
+    conn.release();
   }
 });
 

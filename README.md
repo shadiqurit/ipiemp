@@ -126,7 +126,7 @@ HR_EMPEXAMDET.EMPCODE = IPI000123
 ## MySQL important indexes
 
 ```text
-UNIQUE (MERITLIST_ID, CLASS_ID)
+UNIQUE (batch_no, MERITLIST_ID, CLASS_ID)
 UNIQUE (IPI)
 INDEX  (MERITLIST_ID, CLASS_ID, PHONE)
 ```
@@ -302,3 +302,16 @@ Education `SLNO` is numbered separately for each employee: every employee's
 first education row is `1`, then `2`, `3`, and so on. For an existing
 database, run `database/migration_per_employee_education_slno.sql` once before
 deploying this change.
+
+## Existing database: batch-scoped employee identity
+
+Merit List ID and Class ID are unique together within a batch. The same pair
+may be reused in a different batch. For an existing database, run
+`database/migration_batch_employee_identity.sql` once before deploying the
+matching backend.
+
+## Existing database: public draft saving
+
+New-employee forms can be saved as incomplete drafts and submitted later.
+For an existing database, run `database/migration_allow_employee_drafts.sql`
+once before deploying the matching backend.

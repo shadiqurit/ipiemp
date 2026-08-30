@@ -61,35 +61,40 @@ function hasEnteredDetails(row) {
   return EXAM_COLUMNS.some(column => row[column]);
 }
 
-export function validateAndNormalizeEducation(input) {
+export function validateAndNormalizeEducation(input, { required = true } = {}) {
   const rows = Array.isArray(input) ? input.map(cleanRow) : [];
   const normalized = [];
 
   for (let index = 0; index < EDUCATION_LEVELS.length; index += 1) {
     const row = rows[index] || cleanRow({});
-    const required = index < 3;
-    const active = required || hasEnteredDetails(row);
+    const rowRequired = required && index < 3;
+    const active = rowRequired || hasEnteredDetails(row);
 
-    if (!active) continue;
+    if (!active) {
+      if (!required) normalized.push(row);
+      continue;
+    }
 
-    for (const field of REQUIRED_DETAILS) {
-      if (!row[field]) {
-        const label = field === 'BOARD' && index >= 2 ? 'University' : FIELD_LABELS[field];
-        throw Object.assign(
-          new Error(`${EDUCATION_LEVELS[index]}: ${label} is required.`),
-          { status: 400 }
-        );
+    if (required) {
+      for (const field of REQUIRED_DETAILS) {
+        if (!row[field]) {
+          const label = field === 'BOARD' && index >= 2 ? 'University' : FIELD_LABELS[field];
+          throw Object.assign(
+            new Error(`${EDUCATION_LEVELS[index]}: ${label} is required.`),
+            { status: 400 }
+          );
+        }
       }
     }
 
-    if (!EDUCATION_LEVEL_OPTIONS[index].includes(row.EXAMNAME)) {
+    if (row.EXAMNAME && !EDUCATION_LEVEL_OPTIONS[index].includes(row.EXAMNAME)) {
       throw Object.assign(
         new Error(`${EDUCATION_LEVELS[index]}: select a valid education level.`),
         { status: 400 }
       );
     }
 
-    if (index < 2 && !EDUCATION_BOARDS.includes(row.BOARD)) {
+    if (index < 2 && row.BOARD && !EDUCATION_BOARDS.includes(row.BOARD)) {
       throw Object.assign(
         new Error(`${EDUCATION_LEVELS[index]}: select a valid education board from the list.`),
         { status: 400 }
@@ -97,7 +102,7 @@ export function validateAndNormalizeEducation(input) {
     }
 
     if (index < 2) {
-      if (!EDUCATION_GROUPS.includes(row.EXAMGROUP)) {
+      if (row.EXAMGROUP && !EDUCATION_GROUPS.includes(row.EXAMGROUP)) {
         throw Object.assign(
           new Error(`${EDUCATION_LEVELS[index]}: select a valid Group from the list.`),
           { status: 400 }
@@ -105,7 +110,7 @@ export function validateAndNormalizeEducation(input) {
       }
       row.SUBJECT_NAME = null;
     } else {
-      if (!row.SUBJECT_NAME) {
+      if (required && !row.SUBJECT_NAME) {
         throw Object.assign(
           new Error(`${EDUCATION_LEVELS[index]}: Subject is required.`),
           { status: 400 }

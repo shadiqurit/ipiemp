@@ -40,8 +40,8 @@ function cleanObj(input, columns) {
   return out;
 }
 
-function validateEmployee(e) {
-  if (!e.NAME) {
+function validateEmployee(e, { required = true } = {}) {
+  if (required && !e.NAME) {
     throw Object.assign(new Error('Employee name is required.'), { status: 400 });
   }
 
@@ -51,11 +51,11 @@ function validateEmployee(e) {
     }
   }
 
-  normalizeAndValidateEmployeePhones(e);
-  normalizeAndValidateMeasurements(e);
-  normalizeAndValidateEmployeeNids(e);
+  normalizeAndValidateEmployeePhones(e, { required });
+  normalizeAndValidateMeasurements(e, { required });
+  normalizeAndValidateEmployeeNids(e, { required });
 
-  if (e.MARITAL_STATUS === 'M' && !e.SPOUSE_NAME) {
+  if (required && e.MARITAL_STATUS === 'M' && !e.SPOUSE_NAME) {
     throw Object.assign(new Error('Spouse name is required when marital status is Married.'), { status: 400 });
   }
 }
@@ -67,6 +67,7 @@ async function getVerifiedEmployee(conn, meritlistId, classId, phone, lock = fal
       WHERE MERITLIST_ID = ?
         AND CLASS_ID = ?
         AND RIGHT(REPLACE(REPLACE(PHONE, ' ', ''), '+', ''), 11) = ?
+      ORDER BY CREATED_AT DESC, EMP_ENTRY_ID DESC
       LIMIT 1` + (lock ? ' FOR UPDATE' : '');
 
   const [rows] = await conn.execute(
@@ -77,15 +78,19 @@ async function getVerifiedEmployee(conn, meritlistId, classId, phone, lock = fal
   return rows[0] || null;
 }
 
-async function getEmployeeByIdentity(conn, meritlistId, classId, lock = false) {
+async function getEmployeeByIdentity(conn, meritlistId, classId, batchNo = '', lock = false) {
+  const batchCondition = batchNo ? ' AND batch_no = ?' : '';
+  const params = batchNo ? [meritlistId, classId, batchNo] : [meritlistId, classId];
   const sql =
     `SELECT *
        FROM up_emp
       WHERE MERITLIST_ID = ?
         AND CLASS_ID = ?
+        ${batchCondition}
+      ORDER BY CREATED_AT DESC, EMP_ENTRY_ID DESC
       LIMIT 1` + (lock ? ' FOR UPDATE' : '');
 
-  const [rows] = await conn.execute(sql, [meritlistId, classId]);
+  const [rows] = await conn.execute(sql, params);
   return rows[0] || null;
 }
 
@@ -115,7 +120,7 @@ router.get('/app-state', async (req, res, next) => {
  * MERITLIST_ID + CLASS_ID + PHONE must all match.
  *
  * New employee:
- * No row may already exist for MERITLIST_ID + CLASS_ID.
+ * No row may already exist for BATCH_NO + MERITLIST_ID + CLASS_ID.
  * An ACTIVE batch must exist.
  */
 router.post('/employee/lookup', async (req, res, next) => {
@@ -230,19 +235,44 @@ router.post('/employee/new-entry', async (req, res, next) => {
   const conn = await pool.getConnection();
 
   try {
-    const existing = await getEmployeeByIdentity(conn, meritlistId, classId);
-
-    if (existing) {
-      return res.status(409).json({
-        message: 'This Merit List ID and Class ID already exists. Please use existing employee verification.'
-      });
-    }
-
     const active = await getActiveBatch(conn);
 
     if (!active) {
       return res.status(409).json({
         message: 'New employee submissions are available only while a batch is ACTIVE.'
+      });
+    }
+
+    const existing = await getEmployeeByIdentity(
+      conn,
+      meritlistId,
+      classId,
+      active.BATCH_NO
+    );
+
+    if (existing) {
+      if (existing.APPROVAL_STATUS === 'DRAFT') {
+        const [education] = await conn.execute(
+          `SELECT SLNO, EMP_ENTRY_ID, EMPCODE, EXAMNAME, EXAMGROUP, BOARD, CLAS,
+                  PASSYEAR, REMARKS, INSTITUTE, SUBJECT_NAME
+             FROM hr_empexamdet
+            WHERE EMP_ENTRY_ID = ?
+            ORDER BY SLNO`,
+          [existing.EMP_ENTRY_ID]
+        );
+
+        return res.json({
+          canCreate: true,
+          resumeDraft: true,
+          activeBatch: active.BATCH_NO,
+          identity: { meritlistId, classId },
+          employee: existing,
+          education
+        });
+      }
+
+      return res.status(409).json({
+        message: `This Merit List ID and Class ID already exists in batch ${active.BATCH_NO}. Duplicates are not allowed within the same batch.`
       });
     }
 
@@ -261,6 +291,7 @@ router.post('/employee/new-entry', async (req, res, next) => {
 
 router.post('/employee/save', async (req, res, next) => {
   const newEntry = Boolean(req.body?.newEntry);
+  const submitForApproval = !newEntry || req.body?.submitForApproval !== false;
   const identity = {
     meritlistId: String(req.body?.identity?.meritlistId || '').trim(),
     classId: String(req.body?.identity?.classId || '').trim(),
@@ -287,11 +318,11 @@ router.post('/employee/save', async (req, res, next) => {
 
   const education = Array.isArray(req.body?.education) ? req.body.education : [];
 
-  validateEmployee(employee);
+  validateEmployee(employee, { required: submitForApproval });
 
   let normalizedEducation;
   try {
-    normalizedEducation = validateAndNormalizeEducation(education);
+    normalizedEducation = validateAndNormalizeEducation(education, { required: submitForApproval });
   } catch (e) {
     return next(e);
   }
@@ -308,27 +339,44 @@ router.post('/employee/save', async (req, res, next) => {
   try {
     await conn.beginTransaction();
 
-    let current = newEntry
-      ? await getEmployeeByIdentity(
+    let active = null;
+    let current;
+
+    if (newEntry) {
+      active = await getActiveBatch(conn);
+
+      if (!active) {
+        throw Object.assign(
+          new Error('There is no ACTIVE batch for new submissions.'),
+          { status: 409 }
+        );
+      }
+
+      current = await getEmployeeByIdentity(
         conn,
         identity.meritlistId,
         identity.classId,
+        active.BATCH_NO,
         true
-      )
-      : await getVerifiedEmployee(
+      );
+    } else {
+      current = await getVerifiedEmployee(
         conn,
         identity.meritlistId,
         identity.classId,
         identity.phone,
         true
       );
+    }
 
     let empEntryId;
     let ipi = null;
 
-    if (newEntry && current) {
+    const resumingDraft = newEntry && current?.APPROVAL_STATUS === 'DRAFT';
+
+    if (newEntry && current && !resumingDraft) {
       throw Object.assign(
-        new Error('This Merit List ID and Class ID already exists. Please use existing employee verification.'),
+        new Error(`This Merit List ID and Class ID already exists in batch ${active.BATCH_NO}. Duplicates are not allowed within the same batch.`),
         { status: 409 }
       );
     }
@@ -339,6 +387,7 @@ router.post('/employee/save', async (req, res, next) => {
           conn,
           identity.meritlistId,
           identity.classId,
+          '',
           true
         );
 
@@ -350,7 +399,7 @@ router.post('/employee/save', async (req, res, next) => {
         }
       }
 
-      const active = await getActiveBatch(conn);
+      active ||= await getActiveBatch(conn);
 
       if (!active) {
         throw Object.assign(
@@ -372,7 +421,7 @@ router.post('/employee/save', async (req, res, next) => {
         identity.classId,
         ...EMP_COLUMNS.map(c => employee[c] || null),
         active.BATCH_NO,
-        'PENDING'
+        submitForApproval ? 'PENDING' : 'DRAFT'
       ];
 
       const [result] = await conn.execute(
@@ -383,6 +432,31 @@ router.post('/employee/save', async (req, res, next) => {
       );
 
       empEntryId = result.insertId;
+
+    } else if (resumingDraft) {
+      empEntryId = current.EMP_ENTRY_ID;
+      ipi = current.IPI || null;
+
+      const updateCols = EMP_COLUMNS;
+      const setSql = updateCols.map(c => `${c} = ?`).join(',');
+
+      await conn.execute(
+        `UPDATE up_emp
+            SET ${setSql},
+                APPROVAL_STATUS = ?,
+                UPDATED_AT = NOW()
+          WHERE EMP_ENTRY_ID = ?`,
+        [
+          ...updateCols.map(c => employee[c] || null),
+          submitForApproval ? 'PENDING' : 'DRAFT',
+          current.EMP_ENTRY_ID
+        ]
+      );
+
+      await conn.execute(
+        `DELETE FROM hr_empexamdet WHERE EMP_ENTRY_ID = ?`,
+        [current.EMP_ENTRY_ID]
+      );
 
     } else {
       empEntryId = current.EMP_ENTRY_ID;
@@ -453,13 +527,20 @@ router.post('/employee/save', async (req, res, next) => {
       ok: true,
       empEntryId,
       ipi,
-      message: current
-        ? 'Employee information updated successfully.'
-        : 'Employee information submitted and is waiting for admin approval.'
+      submitted: submitForApproval,
+      message: newEntry
+        ? submitForApproval
+          ? 'Employee information submitted and is waiting for admin approval.'
+          : 'Draft saved successfully. You can continue editing and submit it later.'
+        : 'Employee information updated successfully.'
     });
 
   } catch (e) {
     await conn.rollback();
+    if (e.code === 'ER_DUP_ENTRY') {
+      e.status = 409;
+      e.message = 'This Merit List ID and Class ID already exists in the active batch. Duplicates are not allowed within the same batch.';
+    }
     next(e);
   } finally {
     conn.release();

@@ -12,7 +12,8 @@ import { t } from '../i18n';
 
 const props = defineProps({
   modelValue: { type: Array, required: true },
-  disabled: { type: Boolean, default: false }
+  disabled: { type: Boolean, default: false },
+  requireComplete: { type: Boolean, default: true }
 });
 
 defineEmits(['update:modelValue']);
@@ -21,6 +22,7 @@ const universityOptions = UNIVERSITY_OPTIONS.map(value => ({ value, label: value
 const rows = computed(() => props.modelValue);
 
 function isRequired(index) {
+  if (!props.requireComplete) return false;
   if (index < 3) return true;
   const row = rows.value[index] || {};
   return ['EXAMNAME', 'BOARD', 'CLAS', 'PASSYEAR', 'INSTITUTE', 'EXAMGROUP', 'SUBJECT_NAME', 'REMARKS']
@@ -38,8 +40,8 @@ function selectEducationBoard(item) {
   <div v-for="(item, index) in rows" :key="EDUCATION_LEVELS[index]" class="edu">
     <div class="section-title">
       <b>{{ t('Level') }} {{ index + 1 }} — {{ EDUCATION_LEVELS[index] }}</b>
-      <span class="requirement-label" :class="index < 3 ? 'required' : 'optional'">
-        {{ t(index < 3 ? 'Required' : 'Optional') }}
+      <span class="requirement-label" :class="props.requireComplete && index < 3 ? 'required' : 'optional'">
+        {{ t(props.requireComplete && index < 3 ? 'Required' : 'Optional') }}
       </span>
     </div>
 
@@ -79,8 +81,8 @@ function selectEducationBoard(item) {
       </div>
 
       <div v-if="index < 2" class="field">
-        <label>{{ t('Group') }} *</label>
-        <select v-model="item.EXAMGROUP" :disabled="disabled" required>
+        <label>{{ t('Group') }}<span v-if="isRequired(index)"> *</span></label>
+        <select v-model="item.EXAMGROUP" :disabled="disabled" :required="isRequired(index)">
           <option value="">{{ t('Select') }}</option>
           <option v-for="group in EDUCATION_GROUPS" :key="group" :value="group">{{ t(group) }}</option>
         </select>

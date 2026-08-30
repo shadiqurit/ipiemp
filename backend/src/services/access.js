@@ -24,7 +24,11 @@ export async function getEmployeePermission(
   if (approvalStatus !== 'APPROVED') {
     return {
       canEdit: false,
-      reason: approvalStatus === 'REJECTED' ? 'REJECTED' : 'PENDING_APPROVAL',
+      reason: approvalStatus === 'DRAFT'
+        ? 'DRAFT'
+        : approvalStatus === 'REJECTED'
+          ? 'REJECTED'
+          : 'PENDING_APPROVAL',
       approvedUntil: null,
       pending: false
     };

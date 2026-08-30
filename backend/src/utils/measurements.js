@@ -1,5 +1,13 @@
-export function normalizeAndValidateMeasurements(employee) {
+export function normalizeAndValidateMeasurements(employee, { required = true } = {}) {
   const height = String(employee.HEIGHT || '').trim();
+  const weight = String(employee.WEIGHT || '').trim();
+
+  if (!required) {
+    employee.HEIGHT = height || null;
+    employee.WEIGHT = weight || null;
+    return;
+  }
+
   if (height) {
     const match = height.match(/^(\d{1,2})\s*'\s*(\d{1,2})\s*"?$/)
       || height.match(/^(\d{1,2})\s*(?:ft|feet|[.\-])\s*(\d{1,2})\s*(?:in|inches?)?$/i);
@@ -18,7 +26,6 @@ export function normalizeAndValidateMeasurements(employee) {
     employee.HEIGHT = null;
   }
 
-  const weight = String(employee.WEIGHT || '').trim();
   if (weight && !/^\d+(?:\.\d+)?$/.test(weight)) {
     throw Object.assign(
       new Error('Weight must be a number in kilograms.'),

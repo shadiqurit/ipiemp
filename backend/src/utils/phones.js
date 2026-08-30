@@ -41,21 +41,31 @@ export function localPhoneDigits(value) {
   return BANGLADESH_MOBILE_PATTERN.test(normalized) ? normalized : '';
 }
 
-export function normalizeAndValidateEmployeePhones(employee) {
-  if (employee.MARITAL_STATUS !== 'M') {
+export function normalizeAndValidateEmployeePhones(employee, { required = true } = {}) {
+  if (
+    (required && employee.MARITAL_STATUS !== 'M') ||
+    (!required && employee.MARITAL_STATUS && employee.MARITAL_STATUS !== 'M')
+  ) {
     for (const field of SPOUSE_FIELDS) employee[field] = null;
   }
 
-  const requiredFields = employee.MARITAL_STATUS === 'M'
+  const submissionFields = employee.MARITAL_STATUS === 'M'
     ? [...PHONE_FIELDS, SPOUSE_PHONE_FIELD]
     : PHONE_FIELDS;
 
-  for (const field of requiredFields) {
+  for (const field of [...PHONE_FIELDS, SPOUSE_PHONE_FIELD]) {
     employee[field] = normalizePhone(employee[field]);
+
+    if (!required) {
+      employee[field] ||= null;
+      continue;
+    }
+
+    if (!submissionFields.includes(field)) continue;
 
     if (!BANGLADESH_MOBILE_PATTERN.test(employee[field])) {
       throw Object.assign(
-        new Error(`${PHONE_LABELS[field]} is required and must be an 11-digit Bangladesh mobile number starting with 013, 014, 015, 016, 017, 018 or 019.`),
+        new Error(`${PHONE_LABELS[field]} ${required ? 'is required and ' : ''}must be an 11-digit Bangladesh mobile number starting with 013, 014, 015, 016, 017, 018 or 019.`),
         { status: 400 }
       );
     }

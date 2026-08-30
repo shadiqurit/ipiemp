@@ -180,7 +180,10 @@ async function lookup() {
     canRequestUpdate.value = !!data.canRequestUpdate;
     requestPending.value = !!data.pending;
 
-    if (data.reason === 'PENDING_APPROVAL') {
+    if (data.reason === 'DRAFT') {
+      message.value = 'This employee entry is saved as a draft. Use the New Employee section to continue editing it.';
+
+    } else if (data.reason === 'PENDING_APPROVAL') {
       message.value = 'Identity verified. Your new employee data is waiting for admin approval.';
 
     } else if (data.reason === 'REJECTED') {
@@ -232,20 +235,31 @@ async function startNew() {
     verifiedIdentity.classId = data.identity.classId;
     verifiedIdentity.phone = '';
     resetEmployee();
+
+    if (data.resumeDraft) {
+      Object.keys(employee).forEach(key => {
+        employee[key] = data.employee?.[key] ?? '';
+      });
+      education.value = normalizeEducationRows(data.education);
+    }
+
     mode.value = 'NEW';
     batchNo.value = data.activeBatch;
     canRequestUpdate.value = false;
     requestPending.value = false;
-    message.value = 'New employee entry. Complete the form and submit it for admin approval.';
+    message.value = data.resumeDraft
+      ? 'Your saved draft has been loaded. Continue editing and submit it when complete.'
+      : 'New employee entry. Save your progress at any stage, then submit the completed form for admin approval.';
     await revealForm(true);
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Employee entry could not be started');
   } finally {
     busy.value = false;
   }
 }
 
-async function save() {
+async function save(submitForApproval = true) {
   busy.value = true;
 
   try {
@@ -254,12 +268,16 @@ async function save() {
       identity: verifiedIdentity,
       employee,
       education: education.value,
-      newEntry: isNewEntry
+      newEntry: isNewEntry,
+      submitForApproval
     });
 
     message.value = data.message || 'Employee information saved successfully.';
-    notifySuccess(message.value, isNewEntry ? 'Employee submitted' : 'Employee updated');
-    if (isNewEntry) {
+    notifySuccess(
+      message.value,
+      isNewEntry && !data.submitted ? 'Draft saved' : isNewEntry ? 'Employee submitted' : 'Employee updated'
+    );
+    if (isNewEntry && data.submitted) {
       mode.value = 'VIEW';
       canRequestUpdate.value = false;
       requestPending.value = false;
@@ -424,7 +442,7 @@ onMounted(async () => {
 
     <div v-if="message" class="notice" role="status" aria-live="polite">{{ message }}</div>
 
-    <form v-if="mode" class="form" @submit.prevent="save">
+    <form v-if="mode" class="form" @submit.prevent="save(true)">
       <nav class="form-nav" :aria-label="t('Form sections')">
         <a href="#identity">01 {{ t('Employee Identity') }}</a>
         <a href="#basic">02 {{ t('Basic Information') }}</a>
@@ -694,13 +712,33 @@ onMounted(async () => {
         </button>
 
         <button
-          v-if="editable"
+          v-if="mode === 'NEW'"
+          :disabled="busy"
+          :aria-busy="busy"
+          type="button"
+          @click="save(false)"
+        >
+          {{ t(busy ? 'Saving…' : 'Save Data') }}
+        </button>
+
+        <button
+          v-if="mode === 'NEW'"
           class="primary"
           :disabled="busy"
           :aria-busy="busy"
           type="submit"
         >
-          {{ t(busy ? 'Saving…' : mode === 'EDIT' ? 'Update Employee' : 'Submit Employee Data') }}
+          {{ t(busy ? 'Submitting…' : 'Submit Employee Data') }}
+        </button>
+
+        <button
+          v-else-if="mode === 'EDIT'"
+          class="primary"
+          :disabled="busy"
+          :aria-busy="busy"
+          type="submit"
+        >
+          {{ t(busy ? 'Saving…' : 'Update Employee') }}
         </button>
       </section>
     </form>
