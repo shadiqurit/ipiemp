@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { api } from '../api';
 import AutoCompleteSelect from '../components/AutoCompleteSelect.vue';
 import DateInput from '../components/DateInput.vue';
@@ -124,6 +124,17 @@ function onPermanentInput() {
   if (sameAddress.value) copyPermanent();
 }
 
+async function revealForm(focusFirstField = false) {
+  await nextTick();
+  const section = document.querySelector(focusFirstField ? '#basic' : '#identity');
+  section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  if (focusFirstField) {
+    const firstInput = section?.querySelector('input:not(:disabled):not([readonly])');
+    firstInput?.focus({ preventScroll: true });
+  }
+}
+
 async function loadState() {
   const { data } = await api.get('/public/app-state');
   state.value = data;
@@ -196,6 +207,8 @@ async function lookup() {
         'Identity verified. Your batch is INACTIVE, so the record is view-only.';
     }
 
+    await revealForm(false);
+
   } catch (e) {
     mode.value = '';
     message.value = e.response?.data?.message || e.message;
@@ -228,6 +241,7 @@ async function startNew() {
     canRequestUpdate.value = false;
     requestPending.value = false;
     message.value = 'New employee entry. Complete the form and submit it for admin approval.';
+    await revealForm(true);
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
   } finally {
@@ -328,94 +342,105 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section class="card">
-      <h2>{{ t('Existing Employee Verification') }}</h2>
-      <p class="muted">
-        For an existing record, all three values must match exactly.
-      </p>
+    <div v-if="!mode" class="entry-options">
+      <section class="card entry-card existing-entry">
+        <span class="entry-type">{{ t('Existing Employee Verification') }}</span>
+        <h2>{{ t('Find and update your information') }}</h2>
+        <p class="muted">
+          For an existing record, all three values must match exactly.
+        </p>
 
-      <div class="grid">
-        <div class="field">
-          <label>{{ t('Merit List ID') }}</label>
-          <input
-            v-model="credentials.meritlistId"
-            :disabled="!!mode"
-            :placeholder="t('Enter Merit List ID')"
-          />
+        <div class="grid">
+          <div class="field">
+            <label>{{ t('Merit List ID') }}</label>
+            <input
+              v-model="credentials.meritlistId"
+              autocomplete="off"
+              :placeholder="t('Enter Merit List ID')"
+            />
+          </div>
+
+          <div class="field">
+            <label>{{ t('Class ID') }}</label>
+            <input
+              v-model="credentials.classId"
+              autocomplete="off"
+              :placeholder="t('Enter Class ID')"
+            />
+          </div>
+
+          <div class="field">
+            <label>{{ t('Phone Number') }}</label>
+            <input
+              v-model="credentials.phone"
+              type="tel"
+              inputmode="tel"
+              autocomplete="tel"
+              :placeholder="t('Enter primary phone')"
+              @keyup.enter="lookup"
+            />
+          </div>
         </div>
 
-        <div class="field">
-          <label>{{ t('Class ID') }}</label>
-          <input
-            v-model="credentials.classId"
-            :disabled="!!mode"
-            :placeholder="t('Enter Class ID')"
-          />
+        <div class="lookup-actions">
+          <button class="primary" :disabled="busy" :aria-busy="busy" @click="lookup">
+            {{ t(busy ? 'Checking…' : 'Verify Existing Employee') }}
+          </button>
+        </div>
+      </section>
+
+      <section class="card entry-card new-entry">
+        <span class="entry-type">{{ t('New Employee') }}</span>
+        <h2>{{ t('Create a first-time entry') }}</h2>
+        <p class="muted">
+          Enter Merit List ID and Class ID, then complete the guided form. An admin will review the submission.
+        </p>
+
+        <div class="grid">
+          <div class="field">
+            <label>{{ t('Merit List ID') }}</label>
+            <input v-model="newIdentity.meritlistId" autocomplete="off" :placeholder="t('Enter Merit List ID')" />
+          </div>
+
+          <div class="field">
+            <label>{{ t('Class ID') }}</label>
+            <input v-model="newIdentity.classId" autocomplete="off" :placeholder="t('Enter Class ID')" @keyup.enter="startNew" />
+          </div>
         </div>
 
-        <div class="field">
-          <label>{{ t('Phone Number') }}</label>
-          <input
-            v-model="credentials.phone"
-            :disabled="!!mode"
-            :placeholder="t('Enter primary phone')"
-            @keyup.enter="lookup"
-          />
+        <div class="lookup-actions">
+          <button class="primary" :disabled="busy" :aria-busy="busy" @click="startNew">
+            {{ t(busy ? 'Starting…' : 'Start New Employee Entry') }}
+          </button>
         </div>
+      </section>
+    </div>
+
+    <section v-else class="session-strip">
+      <div>
+        <strong>{{ t('Employee form in progress') }}</strong>
+        <span>{{ verifiedIdentity.meritlistId }} · {{ verifiedIdentity.classId }} · {{ t('Batch') }} {{ batchNo }}</span>
       </div>
-
-      <div class="lookup-actions">
-        <button
-          v-if="!mode"
-          class="primary"
-          :disabled="busy"
-          @click="lookup"
-        >
-          {{ t('Verify Existing Employee') }}
-        </button>
-
-        <button
-          v-else
-          type="button"
-          @click="startOver"
-        >
-          {{ t('Use Another Employee') }}
-        </button>
-      </div>
+      <button type="button" @click="startOver">{{ t('Use Another Employee') }}</button>
     </section>
 
-    <section v-if="!mode" class="card">
-      <h2>{{ t('New Employee') }}</h2>
-      <p class="muted">
-        New employees do not need to verify a phone number first. Enter Merit List ID and Class ID,
-        then complete the form. The submission must be approved by an admin.
-      </p>
-
-      <div class="grid">
-        <div class="field">
-          <label>{{ t('Merit List ID') }}</label>
-          <input v-model="newIdentity.meritlistId" :placeholder="t('Enter Merit List ID')" />
-        </div>
-
-        <div class="field">
-          <label>{{ t('Class ID') }}</label>
-          <input v-model="newIdentity.classId" :placeholder="t('Enter Class ID')" @keyup.enter="startNew" />
-        </div>
-      </div>
-
-      <div class="lookup-actions">
-        <button class="primary" :disabled="busy" @click="startNew">
-          {{ t('Start New Employee Entry') }}
-        </button>
-      </div>
-    </section>
-
-    <div v-if="message" class="notice">{{ message }}</div>
+    <div v-if="message" class="notice" role="status" aria-live="polite">{{ message }}</div>
 
     <form v-if="mode" class="form" @submit.prevent="save">
-      <section class="card">
+      <nav class="form-nav" :aria-label="t('Form sections')">
+        <a href="#identity">01 {{ t('Employee Identity') }}</a>
+        <a href="#basic">02 {{ t('Basic Information') }}</a>
+        <a href="#contact">03 {{ t('Contact & Identity') }}</a>
+        <a href="#address">04 {{ t('Address Information') }}</a>
+        <a href="#emergency">05 {{ t('Emergency Contact') }}</a>
+        <a href="#family">06 {{ t('Family & Spouse') }}</a>
+        <a href="#guarantor">07 {{ t('Guarantor Information') }}</a>
+        <a href="#education">08 {{ t('Education') }}</a>
+      </nav>
+
+      <section id="identity" class="card">
         <div class="section-title">
-          <h2>{{ t('Employee Identity') }}</h2>
+          <h2 data-step="01">{{ t('Employee Identity') }}</h2>
           <span>{{ t('Batch') }}: {{ batchNo }}</span>
         </div>
 
@@ -440,9 +465,9 @@ onMounted(async () => {
         </div>
       </section>
 
-      <section class="card">
+      <section id="basic" class="card">
         <div class="section-title">
-          <h2>{{ t('Basic Information') }}</h2>
+          <h2 data-step="02">{{ t('Basic Information') }}</h2>
         </div>
 
         <div class="grid">
@@ -451,10 +476,10 @@ onMounted(async () => {
             :key="key"
             class="field"
           >
-            <label>{{ t(label) }}</label>
+            <label>{{ t(label) }}<span v-if="key === 'NAME'" class="required-mark"> *</span></label>
             <select v-if="key === 'BLD_GROUP'" v-model="employee[key]" :disabled="!editable"><option value="">{{ t('Select') }}</option><option v-for="group in BLOOD_GROUPS" :key="group" :value="group">{{ group }}</option></select>
             <DateInput v-else-if="type === 'date'" v-model="employee[key]" :disabled="!editable" />
-            <input v-else v-model="employee[key]" :type="type || 'text'" :disabled="!editable" />
+            <input v-else v-model="employee[key]" :type="type || 'text'" :disabled="!editable" :required="key === 'NAME'" :autocomplete="key === 'NAME' ? 'name' : 'off'" />
           </div>
 
           <div class="field">
@@ -474,8 +499,8 @@ onMounted(async () => {
         </div>
       </section>
 
-      <section class="card">
-        <h2>{{ t('Contact & Identity') }}</h2>
+      <section id="contact" class="card">
+        <h2 data-step="03">{{ t('Contact & Identity') }}</h2>
 
         <div class="grid">
           <div
@@ -483,10 +508,13 @@ onMounted(async () => {
             :key="key"
             class="field"
           >
-            <label>{{ t(label) }}</label>
+            <label>{{ t(label) }}<span v-if="key === 'PHONE'" class="required-mark"> *</span></label>
             <input
               v-model="employee[key]"
-              :type="type || 'text'"
+              :type="type || (key.includes('PHONE') ? 'tel' : 'text')"
+              :inputmode="key.includes('PHONE') ? 'tel' : undefined"
+              :autocomplete="key === 'EMAIL' ? 'email' : key === 'PHONE' ? 'tel' : 'off'"
+              :required="key === 'PHONE'"
               :disabled="!editable || (key === 'PHONE' && mode !== 'NEW')"
             />
           </div>
@@ -500,8 +528,8 @@ onMounted(async () => {
         </p>
       </section>
 
-      <section class="card">
-        <h2>{{ t('Address Information') }}</h2>
+      <section id="address" class="card">
+        <h2 data-step="04">{{ t('Address Information') }}</h2>
 
         <div class="address-grid">
           <div class="address-box">
@@ -581,8 +609,8 @@ onMounted(async () => {
         </div>
       </section>
 
-      <section class="card">
-        <h2>{{ t('Emergency Contact') }}</h2>
+      <section id="emergency" class="card">
+        <h2 data-step="05">{{ t('Emergency Contact') }}</h2>
 
         <div class="grid">
           <div
@@ -591,13 +619,13 @@ onMounted(async () => {
             class="field"
           >
             <label>{{ t(label) }}</label>
-            <input v-model="employee[key]" :disabled="!editable" />
+            <input v-model="employee[key]" :type="key.includes('PHONE') ? 'tel' : 'text'" :inputmode="key.includes('PHONE') ? 'tel' : undefined" :disabled="!editable" />
           </div>
         </div>
       </section>
 
-      <section class="card">
-        <h2>{{ t('Family & Spouse') }}</h2>
+      <section id="family" class="card">
+        <h2 data-step="06">{{ t('Family & Spouse') }}</h2>
 
         <div class="grid">
           <div
@@ -608,15 +636,16 @@ onMounted(async () => {
             <label>{{ t(label) }}</label>
             <input
               v-model="employee[key]"
-              :type="type || 'text'"
+              :type="type || (key.includes('PHONE') ? 'tel' : 'text')"
+              :inputmode="key.includes('PHONE') ? 'tel' : undefined"
               :disabled="!editable"
             />
           </div>
         </div>
       </section>
 
-      <section class="card">
-        <h2>{{ t('Guarantor Information') }}</h2>
+      <section id="guarantor" class="card">
+        <h2 data-step="07">{{ t('Guarantor Information') }}</h2>
 
         <div class="grid">
           <div
@@ -625,14 +654,14 @@ onMounted(async () => {
             class="field"
           >
             <label>{{ t(label) }}</label>
-            <input v-model="employee[key]" :disabled="!editable" />
+            <input v-model="employee[key]" :type="key === 'GRNT_MOBILE' ? 'tel' : 'text'" :inputmode="key === 'GRNT_MOBILE' ? 'tel' : undefined" :disabled="!editable" />
           </div>
         </div>
       </section>
 
-      <section class="card">
+      <section id="education" class="card">
         <div class="section-title">
-          <h2>{{ t('Education') }}</h2>
+          <h2 data-step="08">{{ t('Education') }}</h2>
 
           <button
             v-if="editable"
@@ -685,7 +714,7 @@ onMounted(async () => {
 
             <div class="field">
               <label>{{ t('Pass Year') }}</label>
-              <input v-model="edu.PASSYEAR" :disabled="!editable" />
+              <input v-model="edu.PASSYEAR" inputmode="numeric" :disabled="!editable" />
             </div>
 
             <div class="field">
@@ -727,9 +756,10 @@ onMounted(async () => {
           v-if="editable"
           class="primary"
           :disabled="busy"
+          :aria-busy="busy"
           type="submit"
         >
-          {{ t(mode === 'EDIT' ? 'Update Employee' : 'Submit Employee Data') }}
+          {{ t(busy ? 'Saving…' : mode === 'EDIT' ? 'Update Employee' : 'Submit Employee Data') }}
         </button>
       </section>
     </form>

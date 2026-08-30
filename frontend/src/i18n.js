@@ -114,6 +114,10 @@ const bn = {
   'Verify Existing Employee': 'বিদ্যমান ইমপ্লয়ী যাচাই করুন',
   'Use Another Employee': 'অন্য ইমপ্লয়ী ব্যবহার করুন',
   'Start New Employee Entry': 'নতুন ইমপ্লয়ীর তথ্য শুরু করুন',
+  'Find and update your information': 'আপনার তথ্য খুঁজুন ও হালনাগাদ করুন',
+  'Create a first-time entry': 'প্রথমবারের তথ্য এন্ট্রি তৈরি করুন',
+  'Employee form in progress': 'ইমপ্লয়ীর ফর্ম পূরণ চলছে',
+  'Form sections': 'ফর্মের বিভাগসমূহ',
   'Same as Permanent Address': 'স্থায়ী ঠিকানার মতোই',
   'Copy Permanent → Present': 'স্থায়ী থেকে বর্তমান ঠিকানায় কপি করুন',
   '+ Add Education': '+ শিক্ষাগত যোগ্যতা যোগ করুন',
@@ -147,6 +151,8 @@ const bn = {
   'Back to Employee List': 'ইমপ্লয়ী তালিকায় ফিরুন',
   'Save Employee Changes': 'ইমপ্লয়ীর পরিবর্তন সংরক্ষণ করুন',
   'Saving…': 'সংরক্ষণ করা হচ্ছে…',
+  'Checking…': 'যাচাই করা হচ্ছে…',
+  'Starting…': 'শুরু হচ্ছে…',
   'Optional': 'ঐচ্ছিক',
   'DD-MON-YYYY': 'দিন-মাস-বছর'
 };
