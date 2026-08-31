@@ -296,6 +296,98 @@ Verify the deployment with `https://ibnsina.shadiqur.bd`,
 `https://ibnsina.shadiqur.bd/admin`, and
 `https://ibnsina.shadiqur.bd/health`.
 
+## Deploy to cPanel on one subdomain
+
+This project can use one cPanel Node.js application for both the Vue frontend
+and Express API:
+
+```text
+https://ipi.shadiqur.bd       Vue application
+https://ipi.shadiqur.bd/admin Admin application
+https://ipi.shadiqur.bd/api   Express API prefix
+https://ipi.shadiqur.bd/health Health check
+```
+
+This requires a cPanel plan with **Setup Node.js App**. Build the frontend
+before uploading the repository:
+
+```bash
+cd frontend
+npm ci
+npm run build
+```
+
+Keep `VITE_API_URL=/api` for this same-origin deployment. Upload `backend`,
+`frontend/dist`, and the two package lock files, but do not upload either
+`node_modules` directory or any local `.env` files.
+
+Create a production Node.js application using Node 22 with these settings:
+
+```text
+Application root: /home/CPANEL_USER/apps/ipiemp/backend
+Application URL:  https://ipi.shadiqur.bd
+Startup file:     app.js
+```
+
+The uploaded repository should therefore be arranged like this:
+
+```text
+/home/CPANEL_USER/apps/ipiemp/
+  backend/
+    app.js
+    package.json
+    package-lock.json
+    src/
+  frontend/
+    dist/
+      index.html
+      assets/
+```
+
+The backend also detects the common cPanel layout where the compiled frontend
+is already in the subdomain document root:
+
+```text
+/home/CPANEL_USER/ipi.shadiqur.bd/
+  index.html
+  assets/
+  backend/
+    app.js
+    package.json
+    package-lock.json
+    src/
+```
+
+For that layout, set the application root to
+`ipi.shadiqur.bd/backend` while keeping the application URL at the root of
+`https://ipi.shadiqur.bd` (no `/api` application-path suffix).
+
+Install backend dependencies with cPanel's **Run NPM Install** action or run
+`npm ci --omit=dev` from the backend application root. Configure the following
+variables in cPanel and restart the application:
+
+```dotenv
+NODE_ENV=production
+HOST=0.0.0.0
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=CPANEL_USER_employee_app
+DB_PASSWORD=REPLACE_WITH_THE_DATABASE_PASSWORD
+DB_NAME=CPANEL_USER_employee_portal
+DB_SSL=false
+JWT_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
+FRONTEND_ORIGIN=https://ipi.shadiqur.bd
+```
+
+Let cPanel provide `PORT`; do not set it to `3003`. The Express server handles
+Vue history routes, so this setup does not need a frontend `.htaccess` rewrite.
+
+For a new cPanel database, select the prefixed database in phpMyAdmin and
+import `database/schema.sql` after removing its initial `CREATE DATABASE` and
+`USE employee_portal` statements. Assign the cPanel database user all
+privileges first. Do not run the migration files after importing the current
+schema into an empty database.
+
 ## Existing database: education row numbering
 
 Education `SLNO` is numbered separately for each employee: every employee's

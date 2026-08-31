@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
 import publicRoutes from './routes/public.js';
 import adminRoutes from './routes/admin.js';
@@ -44,8 +47,45 @@ app.use('/api/public', rateLimit({
 }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
+app.get('/api', (req, res) => res.json({ ok: true, service: 'Employee Portal API' }));
 app.use('/api/public', publicRoutes);
 app.use('/api/admin', adminRoutes);
+
+// In a single-domain deployment, Express serves the production Vue build as
+// well as the API. Support both the repository layout (frontend/dist) and the
+// common cPanel layout where index.html and assets sit beside backend/.
+const sourceDirectory = path.dirname(fileURLToPath(import.meta.url));
+const configuredFrontendDirectory = String(process.env.FRONTEND_DIST || '').trim();
+const frontendCandidates = configuredFrontendDirectory
+  ? [path.resolve(configuredFrontendDirectory)]
+  : [
+      path.resolve(sourceDirectory, '../../frontend/dist'),
+      path.resolve(sourceDirectory, '../..')
+    ];
+const frontendDirectory = frontendCandidates.find((candidate) => (
+  fs.existsSync(path.join(candidate, 'index.html'))
+));
+const frontendIndex = frontendDirectory
+  ? path.join(frontendDirectory, 'index.html')
+  : '';
+
+if (frontendDirectory) {
+  app.use(express.static(frontendDirectory, { index: false }));
+
+  // Vue Router uses history mode, so browser requests such as /admin must
+  // return index.html. API and health requests must keep their normal 404s.
+  app.use((req, res, next) => {
+    const isFrontendRoute = req.method === 'GET'
+      && !req.path.startsWith('/api')
+      && req.path !== '/health'
+      && req.accepts('html');
+
+    if (!isFrontendRoute) return next();
+
+    res.setHeader('Cache-Control', 'no-cache');
+    return res.sendFile(frontendIndex);
+  });
+}
 
 app.use((err, req, res, next) => {
   console.error(err);
