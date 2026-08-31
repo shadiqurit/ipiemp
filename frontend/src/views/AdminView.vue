@@ -447,7 +447,6 @@ onMounted(refresh);
     <template v-else>
       <section class="toolbar">
         <span>{{ currentUser?.displayName || currentUser?.username }} · {{ isSuperAdmin ? t('Super Admin') : t('Admin') }}</span>
-        <router-link to="/">{{ t('Public Form') }}</router-link>
         <button @click="openOwnPasswordModal">{{ t('Change My Password') }}</button>
         <button @click="refresh">{{ t('Refresh') }}</button>
         <button @click="logout">{{ t('Logout') }}</button>

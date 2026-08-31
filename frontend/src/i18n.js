@@ -150,6 +150,7 @@ const bn = {
   'Admin': 'অ্যাডমিন',
   'Super Admin': 'সুপার অ্যাডমিন',
   'Public Form': 'সাধারণ ফর্ম',
+  'Go to Public Form': 'সাধারণ ফর্মে যান',
   'Refresh': 'রিফ্রেশ',
   'Logout': 'লগআউট',
   'Login': 'লগইন',
