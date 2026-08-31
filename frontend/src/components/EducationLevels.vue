@@ -51,7 +51,7 @@ function sanitizePassYear(item, event) {
 
     <div class="grid">
       <div class="field">
-        <label>{{ t('Education Level') }}<span v-if="isRequired(index)"> *</span></label>
+        <label>{{ t('Education Level') }}<span v-if="isRequired(index)" class="required-mark"> *</span></label>
         <select
           v-model="item.EXAMNAME"
           :disabled="disabled"
@@ -64,7 +64,7 @@ function sanitizePassYear(item, event) {
       </div>
 
       <div class="field">
-        <label>{{ t(index < 2 ? 'Board' : 'University') }}<span v-if="isRequired(index)"> *</span></label>
+        <label>{{ t(index < 2 ? 'Board' : 'University') }}<span v-if="isRequired(index)" class="required-mark"> *</span></label>
         <select
           v-if="index < 2"
           v-model="item.BOARD"
@@ -85,7 +85,7 @@ function sanitizePassYear(item, event) {
       </div>
 
       <div v-if="index < 2" class="field">
-        <label>{{ t('Group') }}<span v-if="isRequired(index)"> *</span></label>
+        <label>{{ t('Group') }}<span v-if="isRequired(index)" class="required-mark"> *</span></label>
         <select v-model="item.EXAMGROUP" :disabled="disabled" :required="isRequired(index)">
           <option value="">{{ t('Select') }}</option>
           <option v-for="group in EDUCATION_GROUPS" :key="group" :value="group">{{ t(group) }}</option>
@@ -93,12 +93,12 @@ function sanitizePassYear(item, event) {
       </div>
 
       <div class="field">
-        <label>{{ t('Class / Result') }}<span v-if="isRequired(index)"> *</span></label>
+        <label>{{ t('Class / Result') }}<span v-if="isRequired(index)" class="required-mark"> *</span></label>
         <input v-model="item.CLAS" :disabled="disabled" :required="isRequired(index)" />
       </div>
 
       <div class="field">
-        <label>{{ t('Pass Year') }}<span v-if="isRequired(index)"> *</span></label>
+        <label>{{ t('Pass Year') }}<span v-if="isRequired(index)" class="required-mark"> *</span></label>
         <input
           v-model="item.PASSYEAR"
           inputmode="numeric"
@@ -111,7 +111,7 @@ function sanitizePassYear(item, event) {
       </div>
 
       <div v-if="index >= 2" class="field">
-        <label>{{ t('Subject') }}<span v-if="isRequired(index)"> *</span></label>
+        <label>{{ t('Subject') }}<span v-if="isRequired(index)" class="required-mark"> *</span></label>
         <input v-model="item.SUBJECT_NAME" :disabled="disabled" :required="isRequired(index)" />
       </div>
 

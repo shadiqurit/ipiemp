@@ -383,7 +383,7 @@ onMounted(async () => {
 
         <div class="grid">
           <div class="field">
-            <label>{{ t('Merit List ID') }}</label>
+            <label>{{ t('Merit List ID') }}<span class="required-mark"> *</span></label>
             <input
               v-model="credentials.meritlistId"
               autocomplete="off"
@@ -392,7 +392,7 @@ onMounted(async () => {
           </div>
 
           <div class="field">
-            <label>{{ t('Class ID') }}</label>
+            <label>{{ t('Class ID') }}<span class="required-mark"> *</span></label>
             <input
               v-model="credentials.classId"
               autocomplete="off"
@@ -401,7 +401,7 @@ onMounted(async () => {
           </div>
 
           <div class="field">
-            <label>{{ t('Phone Number') }}</label>
+            <label>{{ t('Phone Number') }}<span class="required-mark"> *</span></label>
             <PhoneInput
               v-model="credentials.phone"
               autocomplete="tel"
@@ -427,12 +427,12 @@ onMounted(async () => {
 
         <div class="grid">
           <div class="field">
-            <label>{{ t('Merit List ID') }}</label>
+            <label>{{ t('Merit List ID') }}<span class="required-mark"> *</span></label>
             <input v-model="newIdentity.meritlistId" autocomplete="off" :placeholder="t('Enter Merit List ID')" />
           </div>
 
           <div class="field">
-            <label>{{ t('Class ID') }}</label>
+            <label>{{ t('Class ID') }}<span class="required-mark"> *</span></label>
             <input v-model="newIdentity.classId" autocomplete="off" :placeholder="t('Enter Class ID')" @keyup.enter="startNew" />
           </div>
         </div>
