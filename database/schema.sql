@@ -85,6 +85,28 @@ CREATE TABLE up_emp (
     FOREIGN KEY (batch_no) REFERENCES hr_batch_control(BATCH_NO)
 ) ENGINE=InnoDB;
 
+CREATE TABLE hr_empfamilydet (
+  -- Internal relation used before the employee receives an IPI.
+  FAMILY_ID     BIGINT NOT NULL AUTO_INCREMENT,
+  EMP_ENTRY_ID  BIGINT NOT NULL,
+
+  -- Oracle-facing IPI reference; synchronized when an IPI is assigned.
+  EMPCODE       VARCHAR(50) NULL,
+  FNAME         VARCHAR(100) NULL,
+  F_OCUP        VARCHAR(70) NULL,
+  F_ADD         VARCHAR(100) NULL,
+  PHONE         VARCHAR(25) NULL,
+  CHILD_NOS     INT NOT NULL,
+  BIRTH_DATE    DATE NULL,
+
+  PRIMARY KEY (FAMILY_ID),
+  UNIQUE KEY UK_FAMILY_ENTRY_CHILD (EMP_ENTRY_ID, CHILD_NOS),
+  KEY IX_FAMILY_EMPCODE (EMPCODE),
+  CONSTRAINT FK_FAMILY_EMP_ENTRY
+    FOREIGN KEY (EMP_ENTRY_ID) REFERENCES up_emp(EMP_ENTRY_ID)
+    ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 CREATE TABLE hr_empexamdet (
   -- Education sequence is unique only within one employee.
   SLNO          BIGINT NOT NULL,

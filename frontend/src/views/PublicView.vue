@@ -5,10 +5,12 @@ import DateInput from '../components/DateInput.vue';
 import PhoneInput from '../components/PhoneInput.vue';
 import NidInput from '../components/NidInput.vue';
 import EducationLevels from '../components/EducationLevels.vue';
+import ChildInformation from '../components/ChildInformation.vue';
 import HeightInput from '../components/HeightInput.vue';
 import WeightInput from '../components/WeightInput.vue';
 import { formatDateTime } from '../utils/dates';
 import { normalizeEducationRows } from '../utils/education';
+import { normalizeChildren } from '../utils/children';
 import { notifyError, notifySuccess } from '../utils/notifications';
 import { t } from '../i18n';
 
@@ -61,6 +63,7 @@ const employee = reactive({
 });
 
 const education = ref([]);
+const children = ref([]);
 
 const editable = computed(() => ['NEW','EDIT'].includes(mode.value));
 
@@ -93,6 +96,7 @@ const guarantorFields = [
 function resetEmployee() {
   Object.keys(employee).forEach(k => employee[k] = '');
   education.value = normalizeEducationRows();
+  children.value = [];
   batchNo.value = '';
   assignedIpi.value = '';
   sameAddress.value = false;
@@ -119,6 +123,7 @@ function onMaritalStatusChange() {
     employee.SPOSE_OCCUPATION = '';
     employee.SPOUSE_PHONE = '';
     employee.SPOSE_MARRIAGE_DATE = '';
+    children.value = [];
   }
 }
 
@@ -175,6 +180,7 @@ async function lookup() {
     assignedIpi.value = data.employee.IPI || '';
 
     education.value = normalizeEducationRows(data.education);
+    children.value = normalizeChildren(data.children);
 
     mode.value = data.canEdit ? 'EDIT' : 'VIEW';
     canRequestUpdate.value = !!data.canRequestUpdate;
@@ -245,6 +251,7 @@ async function startNew() {
         employee[key] = data.employee?.[key] ?? '';
       });
       education.value = normalizeEducationRows(data.education);
+      children.value = normalizeChildren(data.children);
     }
 
     mode.value = 'NEW';
@@ -272,6 +279,7 @@ async function save(submitForApproval = true) {
       identity: verifiedIdentity,
       employee,
       education: education.value,
+      children: children.value,
       newEntry: isNewEntry,
       submitForApproval
     });
@@ -345,6 +353,7 @@ function startOver() {
 
 onMounted(async () => {
   education.value = normalizeEducationRows();
+  children.value = [];
   await loadState();
 });
 </script>
@@ -673,6 +682,12 @@ onMounted(async () => {
             <input v-else v-model="employee[key]" :disabled="!editable" />
           </div>
         </div>
+
+        <ChildInformation
+          v-if="employee.MARITAL_STATUS === 'M'"
+          v-model="children"
+          :disabled="!editable"
+        />
       </section>
 
       <section id="guarantor" class="card">

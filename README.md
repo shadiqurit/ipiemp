@@ -395,6 +395,15 @@ first education row is `1`, then `2`, `3`, and so on. For an existing
 database, run `database/migration_per_employee_education_slno.sql` once before
 deploying this change.
 
+## Existing database: child information
+
+Child information is optional and is available when Marital Status is Married.
+For an existing database, run
+`database/migration_add_employee_children.sql` once before deploying the
+matching backend. The internal `EMP_ENTRY_ID` relation allows child rows to be
+saved before an administrator assigns the employee's IPI; `EMPCODE` is updated
+automatically when the IPI is assigned or changed.
+
 ## Existing database: batch-scoped employee identity
 
 Merit List ID and Class ID are unique together within a batch. The same pair

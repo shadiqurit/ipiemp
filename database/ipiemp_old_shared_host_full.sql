@@ -15,6 +15,7 @@ SET UNIQUE_CHECKS = 0;
 -- Drop child tables first
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `hr_update_request`;
+DROP TABLE IF EXISTS `hr_empfamilydet`;
 DROP TABLE IF EXISTS `hr_empexamdet`;
 DROP TABLE IF EXISTS `up_emp`;
 DROP TABLE IF EXISTS `hr_batch_control`;
@@ -137,6 +138,26 @@ VALUES
 (2,'1','1',NULL,'APPROVED','sadiq','2026-08-30 04:02:52','Mahmud hasan','BATCH-2026-01','2026-08-21','B+','M','I','Bangladesh','M','mahmudhasanalam91@gmail.com','01709649354','01918589368','5.5','56 kg','7772522400','Chackbara','Hainbari','Shyamanagar','Satkhira','Chackbara','Hainbari','Shyamanagar','Satkhira','Samim','Brother','3 Asadgate, Tanin Center, Mihammadpur, Dhaka','01709649364','Mostafa shahidullah','01912379624','Saleha khatun','01954381368','Sayedatun Neaa','2026-08-28','Nurse','01779133646','Mostafa shahidullah','Father','Nojib mollah','3 Asadgate, Tanin Center, Mihammadpur, Dhaka','Bosila','4448882920','Business','9999yywiwi2','01012379624','2026-08-30 03:20:57','2026-08-30 04:02:52');
 
 ALTER TABLE `up_emp` AUTO_INCREMENT = 5;
+
+-- ------------------------------------------------------------
+-- hr_empfamilydet
+-- ------------------------------------------------------------
+CREATE TABLE `hr_empfamilydet` (
+  `FAMILY_ID` bigint NOT NULL AUTO_INCREMENT,
+  `EMP_ENTRY_ID` bigint NOT NULL,
+  `EMPCODE` varchar(50) DEFAULT NULL,
+  `FNAME` varchar(100) DEFAULT NULL,
+  `F_OCUP` varchar(70) DEFAULT NULL,
+  `F_ADD` varchar(100) DEFAULT NULL,
+  `PHONE` varchar(25) DEFAULT NULL,
+  `CHILD_NOS` int NOT NULL,
+  `BIRTH_DATE` date DEFAULT NULL,
+  PRIMARY KEY (`FAMILY_ID`),
+  UNIQUE KEY `UK_FAMILY_ENTRY_CHILD` (`EMP_ENTRY_ID`,`CHILD_NOS`),
+  KEY `IX_FAMILY_EMPCODE` (`EMPCODE`),
+  CONSTRAINT `FK_FAMILY_EMP_ENTRY`
+    FOREIGN KEY (`EMP_ENTRY_ID`) REFERENCES `up_emp` (`EMP_ENTRY_ID`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
 -- hr_empexamdet

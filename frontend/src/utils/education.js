@@ -1,13 +1,13 @@
 export const EDUCATION_LEVELS = [
-  'SSC / Dakhil',
-  'HSC / Alim',
-  'Fazil / Honours / BA / B.Sc / Degree Pass',
-  'Masters / Kamil / MBA'
+  'SSC / Dakhil / Equivalent',
+  'HSC / Alim / Diploma / Equivalent',
+  'Fazil / Honours / BA / B.Sc / Degree Pass / Equivalent',
+  'Masters / Kamil / MBA / Equivalent'
 ];
 
 export const EDUCATION_LEVEL_OPTIONS = [
   ['SSC', 'Dakhil'],
-  ['HSC', 'Alim'],
+  ['HSC', 'Alim', 'Diploma'],
   ['Fazil', 'Honours', 'BA', 'B.Sc', 'Degree Pass'],
   ['Masters', 'Kamil', 'MBA']
 ];
@@ -118,7 +118,11 @@ function normalizedExamName(index, examName) {
 
   const lower = name.toLowerCase();
   if (index === 0) return /dakhil/.test(lower) ? 'Dakhil' : /ssc/.test(lower) ? 'SSC' : '';
-  if (index === 1) return /alim/.test(lower) ? 'Alim' : /hsc/.test(lower) ? 'HSC' : '';
+  if (index === 1) {
+    if (/alim/.test(lower)) return 'Alim';
+    if (/diploma/.test(lower)) return 'Diploma';
+    return /hsc/.test(lower) ? 'HSC' : '';
+  }
   if (index === 2) {
     if (/fazil/.test(lower)) return 'Fazil';
     if (/honou?rs?/.test(lower)) return 'Honours';
@@ -137,7 +141,7 @@ function normalizedExamName(index, examName) {
 function levelIndex(examName) {
   const name = String(examName || '').toLowerCase();
   if (/ssc|dakhil/.test(name)) return 0;
-  if (/hsc|alim/.test(name)) return 1;
+  if (/hsc|alim|diploma/.test(name)) return 1;
   if (/fazil|honou?rs?|\bba\b|b\.sc|bsc|degree\s*pass/.test(name)) return 2;
   if (/master|kamil|\bma\b|m\.sc|msc|\bmba\b|m\.com|mcom|mbs|mss/.test(name)) return 3;
   return -1;

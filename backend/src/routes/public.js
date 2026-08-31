@@ -10,6 +10,7 @@ import {
 import { validateAndNormalizeEducation } from '../utils/education.js';
 import { normalizeAndValidateMeasurements } from '../utils/measurements.js';
 import { normalizeAndValidateEmployeeNids } from '../utils/nid.js';
+import { validateAndNormalizeChildren } from '../utils/children.js';
 
 const router = Router();
 
@@ -92,6 +93,18 @@ async function getEmployeeByIdentity(conn, meritlistId, classId, batchNo = '', l
 
   const [rows] = await conn.execute(sql, params);
   return rows[0] || null;
+}
+
+async function getEmployeeChildren(conn, empEntryId) {
+  const [rows] = await conn.execute(
+    `SELECT FAMILY_ID, EMP_ENTRY_ID, EMPCODE, FNAME, F_OCUP, F_ADD,
+            PHONE, CHILD_NOS, BIRTH_DATE
+       FROM hr_empfamilydet
+      WHERE EMP_ENTRY_ID = ?
+      ORDER BY CHILD_NOS, FAMILY_ID`,
+    [empEntryId]
+  );
+  return rows;
 }
 
 router.get('/app-state', async (req, res, next) => {
@@ -199,10 +212,13 @@ router.post('/employee/lookup', async (req, res, next) => {
       [employee.EMP_ENTRY_ID]
     );
 
+    const children = await getEmployeeChildren(conn, employee.EMP_ENTRY_ID);
+
     res.json({
       found: true,
       employee,
       education,
+      children,
       batchNo: employee.batch_no,
       ...permission,
       canRequestUpdate:
@@ -261,13 +277,16 @@ router.post('/employee/new-entry', async (req, res, next) => {
           [existing.EMP_ENTRY_ID]
         );
 
+        const children = await getEmployeeChildren(conn, existing.EMP_ENTRY_ID);
+
         return res.json({
           canCreate: true,
           resumeDraft: true,
           activeBatch: active.BATCH_NO,
           identity: { meritlistId, classId },
           employee: existing,
-          education
+          education,
+          children
         });
       }
 
@@ -317,12 +336,17 @@ router.post('/employee/save', async (req, res, next) => {
   employee.PHONE = normalizePhone(employee.PHONE || identity.phone);
 
   const education = Array.isArray(req.body?.education) ? req.body.education : [];
+  const children = Array.isArray(req.body?.children) ? req.body.children : [];
 
   validateEmployee(employee, { required: submitForApproval });
 
   let normalizedEducation;
+  let normalizedChildren;
   try {
     normalizedEducation = validateAndNormalizeEducation(education, { required: submitForApproval });
+    normalizedChildren = validateAndNormalizeChildren(children, {
+      married: employee.MARITAL_STATUS === 'M'
+    });
   } catch (e) {
     return next(e);
   }
@@ -458,6 +482,11 @@ router.post('/employee/save', async (req, res, next) => {
         [current.EMP_ENTRY_ID]
       );
 
+      await conn.execute(
+        `DELETE FROM hr_empfamilydet WHERE EMP_ENTRY_ID = ?`,
+        [current.EMP_ENTRY_ID]
+      );
+
     } else {
       empEntryId = current.EMP_ENTRY_ID;
       ipi = current.IPI || null;
@@ -497,6 +526,11 @@ router.post('/employee/save', async (req, res, next) => {
           WHERE EMP_ENTRY_ID = ?`,
         [current.EMP_ENTRY_ID]
       );
+
+      await conn.execute(
+        `DELETE FROM hr_empfamilydet WHERE EMP_ENTRY_ID = ?`,
+        [current.EMP_ENTRY_ID]
+      );
     }
 
     for (const [index, row] of normalizedEducation.entries()) {
@@ -517,6 +551,24 @@ router.post('/employee/save', async (req, res, next) => {
           row.REMARKS || null,
           row.INSTITUTE || null,
           row.SUBJECT_NAME || null
+        ]
+      );
+    }
+
+    for (const child of normalizedChildren) {
+      await conn.execute(
+        `INSERT INTO hr_empfamilydet
+         (EMP_ENTRY_ID, EMPCODE, FNAME, F_OCUP, F_ADD, PHONE, CHILD_NOS, BIRTH_DATE)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          empEntryId,
+          ipi,
+          child.FNAME || null,
+          child.F_OCUP || null,
+          child.F_ADD || null,
+          child.PHONE || null,
+          child.CHILD_NOS,
+          child.BIRTH_DATE || null
         ]
       );
     }

@@ -1,13 +1,13 @@
 export const EDUCATION_LEVELS = [
-  'SSC / Dakhil',
-  'HSC / Alim',
-  'Fazil / Honours / BA / B.Sc / Degree Pass',
-  'Masters / Kamil / MBA'
+  'SSC / Dakhil / Equivalent',
+  'HSC / Alim / Diploma / Equivalent',
+  'Fazil / Honours / BA / B.Sc / Degree Pass / Equivalent',
+  'Masters / Kamil / MBA / Equivalent'
 ];
 
 export const EDUCATION_LEVEL_OPTIONS = [
   ['SSC', 'Dakhil'],
-  ['HSC', 'Alim'],
+  ['HSC', 'Alim', 'Diploma'],
   ['Fazil', 'Honours', 'BA', 'B.Sc', 'Degree Pass'],
   ['Masters', 'Kamil', 'MBA']
 ];

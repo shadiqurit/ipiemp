@@ -6,10 +6,12 @@ import DateInput from '../components/DateInput.vue';
 import PhoneInput from '../components/PhoneInput.vue';
 import NidInput from '../components/NidInput.vue';
 import EducationLevels from '../components/EducationLevels.vue';
+import ChildInformation from '../components/ChildInformation.vue';
 import HeightInput from '../components/HeightInput.vue';
 import WeightInput from '../components/WeightInput.vue';
 import { formatDateTime } from '../utils/dates';
 import { normalizeEducationRows } from '../utils/education';
+import { normalizeChildren } from '../utils/children';
 import { clearNotifications, notifyError, notifySuccess } from '../utils/notifications';
 import { t } from '../i18n';
 
@@ -48,6 +50,7 @@ const editBatch = ref('');
 const editApprovalStatus = ref('PENDING');
 const editEmployee = reactive({});
 const editEducation = ref([]);
+const editChildren = ref([]);
 
 const employeeFields = [
   ['NAME', 'Employee Name'], ['BIRTHDATE', 'Birth Date', 'date'], ['BLD_GROUP', 'Blood Group'],
@@ -76,6 +79,7 @@ function onEditMaritalStatusChange() {
     editEmployee.SPOSE_OCCUPATION = '';
     editEmployee.SPOUSE_PHONE = '';
     editEmployee.SPOSE_MARRIAGE_DATE = '';
+    editChildren.value = [];
   }
 }
 
@@ -389,6 +393,7 @@ async function openEmployeeEditor(employee) {
     editBatch.value = data.employee.batch_no;
     editApprovalStatus.value = data.employee.APPROVAL_STATUS;
     editEducation.value = normalizeEducationRows(data.education);
+    editChildren.value = normalizeChildren(data.children);
     selectedEmployeeId.value = employee.EMP_ENTRY_ID;
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
@@ -407,7 +412,8 @@ async function saveEmployeeDetails() {
       employee: editEmployee,
       batchNo: editBatch.value,
       approvalStatus: editApprovalStatus.value,
-      education: editEducation.value
+      education: editEducation.value,
+      children: editChildren.value
     });
     message.value = data.message;
     notifySuccess(message.value, 'Employee updated');
@@ -706,6 +712,7 @@ onMounted(refresh);
             <div class="field"><label>{{ t('Mother Name') }}</label><input v-model="editEmployee.MOTHER_NAME" /></div>
             <div class="field"><label>{{ t('Mother Phone') }}</label><PhoneInput v-model="editEmployee.MOTHER_PHONE" :required="false" /></div>
           </div>
+          <ChildInformation v-if="editEmployee.MARITAL_STATUS === 'M'" v-model="editChildren" />
         </section>
 
         <section class="card">

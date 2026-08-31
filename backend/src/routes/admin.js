@@ -8,6 +8,7 @@ import { normalizeAndValidateEmployeePhones } from '../utils/phones.js';
 import { validateAndNormalizeEducation } from '../utils/education.js';
 import { normalizeAndValidateMeasurements } from '../utils/measurements.js';
 import { normalizeAndValidateEmployeeNids } from '../utils/nid.js';
+import { validateAndNormalizeChildren } from '../utils/children.js';
 
 const router = Router();
 
@@ -654,7 +655,16 @@ router.get('/employees/:empEntryId', async (req, res, next) => {
       [empEntryId]
     );
 
-    res.json({ employee: employees[0], education });
+    const [children] = await pool.execute(
+      `SELECT FAMILY_ID, EMP_ENTRY_ID, EMPCODE, FNAME, F_OCUP, F_ADD,
+              PHONE, CHILD_NOS, BIRTH_DATE
+         FROM hr_empfamilydet
+        WHERE EMP_ENTRY_ID = ?
+        ORDER BY CHILD_NOS, FAMILY_ID`,
+      [empEntryId]
+    );
+
+    res.json({ employee: employees[0], education, children });
   } catch (e) {
     next(e);
   }
@@ -694,6 +704,7 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
   const batchNo = String(req.body?.batchNo || '').trim();
   const approvalStatus = String(req.body?.approvalStatus || '').toUpperCase();
   const education = Array.isArray(req.body?.education) ? req.body.education : [];
+  const children = Array.isArray(req.body?.children) ? req.body.children : [];
 
   if (!Number.isInteger(empEntryId) || empEntryId <= 0) {
     return res.status(400).json({ message: 'Invalid employee entry ID.' });
@@ -718,8 +729,12 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
   }
 
   let normalizedEducation;
+  let normalizedChildren;
   try {
     normalizedEducation = validateAndNormalizeEducation(education, { required: requireComplete });
+    normalizedChildren = validateAndNormalizeChildren(children, {
+      married: employee.MARITAL_STATUS === 'M'
+    });
   } catch (e) {
     return next(e);
   }
@@ -811,6 +826,11 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
       [empEntryId]
     );
 
+    await conn.execute(
+      `DELETE FROM hr_empfamilydet WHERE EMP_ENTRY_ID = ?`,
+      [empEntryId]
+    );
+
     for (const [index, row] of normalizedEducation.entries()) {
       await conn.execute(
         `INSERT INTO hr_empexamdet
@@ -829,6 +849,24 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
           row.REMARKS || null,
           row.INSTITUTE || null,
           row.SUBJECT_NAME || null
+        ]
+      );
+    }
+
+    for (const child of normalizedChildren) {
+      await conn.execute(
+        `INSERT INTO hr_empfamilydet
+         (EMP_ENTRY_ID, EMPCODE, FNAME, F_OCUP, F_ADD, PHONE, CHILD_NOS, BIRTH_DATE)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          empEntryId,
+          ipi || null,
+          child.FNAME || null,
+          child.F_OCUP || null,
+          child.F_ADD || null,
+          child.PHONE || null,
+          child.CHILD_NOS,
+          child.BIRTH_DATE || null
         ]
       );
     }
@@ -920,7 +958,7 @@ router.patch('/employees/:empEntryId/approval', async (req, res, next) => {
 
 /**
  * Admin assigns or changes IPI.
- * Education EMPCODE is synchronized in the same transaction.
+ * Education and child EMPCODE values are synchronized in the same transaction.
  */
 router.patch('/employees/:empEntryId/ipi', async (req, res, next) => {
   const empEntryId = Number(req.params.empEntryId);
@@ -984,6 +1022,13 @@ router.patch('/employees/:empEntryId/ipi', async (req, res, next) => {
 
     await conn.execute(
       `UPDATE hr_empexamdet
+          SET EMPCODE = ?
+        WHERE EMP_ENTRY_ID = ?`,
+      [ipi, empEntryId]
+    );
+
+    await conn.execute(
+      `UPDATE hr_empfamilydet
           SET EMPCODE = ?
         WHERE EMP_ENTRY_ID = ?`,
       [ipi, empEntryId]
@@ -1267,9 +1312,27 @@ router.get('/export/:batchNo', async (req, res, next) => {
       [batchNo]
     );
 
+    const [children] = await pool.execute(
+      `SELECT
+          f.EMPCODE,
+          f.FNAME,
+          f.F_OCUP,
+          f.F_ADD,
+          f.PHONE,
+          f.CHILD_NOS,
+          f.BIRTH_DATE
+        FROM hr_empfamilydet f
+        JOIN up_emp e
+          ON e.EMP_ENTRY_ID = f.EMP_ENTRY_ID
+       WHERE e.batch_no = ?
+       ORDER BY e.MERITLIST_ID, e.CLASS_ID, f.CHILD_NOS`,
+      [batchNo]
+    );
+
     const workbook = new ExcelJS.Workbook();
     const empSheet = workbook.addWorksheet('up_emp');
     const examSheet = workbook.addWorksheet('hr_empexamdet');
+    const familySheet = workbook.addWorksheet('HR_EMPFAMILYDET');
 
     if (employees.length) {
       empSheet.columns = Object.keys(employees[0]).map(k => ({
@@ -1291,6 +1354,17 @@ router.get('/export/:batchNo', async (req, res, next) => {
       exams.forEach(r => examSheet.addRow(r));
     } else {
       examSheet.addRow(['No data']);
+    }
+
+    if (children.length) {
+      familySheet.columns = Object.keys(children[0]).map(k => ({
+        header: k,
+        key: k,
+        width: 18
+      }));
+      children.forEach(row => familySheet.addRow(row));
+    } else {
+      familySheet.addRow(['No data']);
     }
 
     res.setHeader(
