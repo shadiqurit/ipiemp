@@ -108,6 +108,39 @@ router.get('/me', (req, res) => {
   });
 });
 
+router.patch('/me/password', async (req, res, next) => {
+  const currentPassword = String(req.body?.currentPassword || '');
+  const newPassword = String(req.body?.newPassword || '');
+
+  if (!currentPassword) {
+    return res.status(400).json({ message: 'Current password is required.' });
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ message: 'New password must be at least 8 characters.' });
+  }
+
+  try {
+    const [rows] = await pool.execute(
+      `SELECT PASSWORD_HASH FROM admin_user
+        WHERE USER_ID = ? AND ACTIVE_YN = 'Y'
+        LIMIT 1`,
+      [req.admin.userId]
+    );
+    if (!rows[0] || !(await bcrypt.compare(currentPassword, rows[0].PASSWORD_HASH))) {
+      return res.status(403).json({ message: 'Current password is incorrect.' });
+    }
+
+    const hash = await bcrypt.hash(newPassword, 12);
+    await pool.execute(
+      `UPDATE admin_user SET PASSWORD_HASH = ? WHERE USER_ID = ?`,
+      [hash, req.admin.userId]
+    );
+    res.json({ ok: true, message: 'Your password was changed.' });
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.get('/users', requireSuperAdmin, async (req, res, next) => {
   try {
     const [rows] = await pool.query(

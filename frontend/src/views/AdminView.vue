@@ -37,6 +37,8 @@ const editUser = reactive({ userId: null, username: '', displayName: '', userTyp
 const passwordModalOpen = ref(false);
 const selectedUser = ref(null);
 const replacementPassword = ref('');
+const ownPasswordModalOpen = ref(false);
+const ownPassword = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' });
 const selectedEmployeeId = ref(null);
 const editLoading = ref(false);
 const editBatch = ref('');
@@ -212,6 +214,36 @@ async function setBatch(batchNo, status) {
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
     notifyError(message.value, 'Batch could not be updated');
+  }
+}
+
+function openOwnPasswordModal() {
+  ownPassword.currentPassword = '';
+  ownPassword.newPassword = '';
+  ownPassword.confirmPassword = '';
+  ownPasswordModalOpen.value = true;
+}
+
+async function changeOwnPassword() {
+  if (ownPassword.newPassword !== ownPassword.confirmPassword) {
+    message.value = 'New password and confirmation do not match.';
+    notifyError(message.value, 'Password could not be changed');
+    return;
+  }
+
+  try {
+    const { data } = await api.patch('/admin/me/password', {
+      currentPassword: ownPassword.currentPassword,
+      newPassword: ownPassword.newPassword
+    });
+    notifySuccess(data.message, 'Password changed');
+    ownPasswordModalOpen.value = false;
+    ownPassword.currentPassword = '';
+    ownPassword.newPassword = '';
+    ownPassword.confirmPassword = '';
+  } catch (e) {
+    message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Password could not be changed');
   }
 }
 
@@ -416,9 +448,21 @@ onMounted(refresh);
       <section class="toolbar">
         <span>{{ currentUser?.displayName || currentUser?.username }} · {{ isSuperAdmin ? t('Super Admin') : t('Admin') }}</span>
         <router-link to="/">{{ t('Public Form') }}</router-link>
+        <button @click="openOwnPasswordModal">{{ t('Change My Password') }}</button>
         <button @click="refresh">{{ t('Refresh') }}</button>
         <button @click="logout">{{ t('Logout') }}</button>
       </section>
+
+      <div v-if="ownPasswordModalOpen" class="modal-backdrop" @click.self="ownPasswordModalOpen = false">
+        <section class="card modal" role="dialog" aria-modal="true" aria-labelledby="change-own-password-title">
+          <div class="section-title"><h2 id="change-own-password-title">{{ t('Change My Password') }}</h2><button type="button" @click="ownPasswordModalOpen = false">{{ t('Close') }}</button></div>
+          <p class="muted">Enter your current password and choose a new password with at least 8 characters.</p>
+          <label>{{ t('Current Password') }}</label><input v-model="ownPassword.currentPassword" type="password" autocomplete="current-password" />
+          <label>{{ t('New Password') }}</label><input v-model="ownPassword.newPassword" type="password" autocomplete="new-password" />
+          <label>{{ t('Confirm New Password') }}</label><input v-model="ownPassword.confirmPassword" type="password" autocomplete="new-password" @keyup.enter="changeOwnPassword" />
+          <div class="modal-actions"><button type="button" @click="ownPasswordModalOpen = false">{{ t('Cancel') }}</button><button class="primary" @click="changeOwnPassword">{{ t('Change Password') }}</button></div>
+        </section>
+      </div>
 
       <nav class="admin-menu" aria-label="Admin menu">
         <button v-if="isSuperAdmin" :class="{ active: activeSection === 'users' }" @click="activeSection = 'users'">{{ t('User List') }}</button>

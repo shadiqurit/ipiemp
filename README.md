@@ -316,7 +316,9 @@ Super Admin accounts can create, edit, activate/deactivate, reset passwords,
 and delete administrator accounts. They can also rename batches, change their
 status, permanently delete empty batches, and delete employee records. Admin
 accounts retain employee, batch, approval,
-request, and export access but cannot manage users or perform permanent deletes.
+request, and export access but cannot manage other users or perform permanent
+deletes. Every logged-in Admin or Super Admin can change their own password by
+confirming their current password.
 
 For an existing database, run
 `database/migration_add_admin_user_types.sql` once before deploying this change.
