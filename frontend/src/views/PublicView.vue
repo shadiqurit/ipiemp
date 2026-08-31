@@ -511,6 +511,7 @@ onMounted(async () => {
             <HeightInput v-else-if="key === 'HEIGHT'" v-model="employee.HEIGHT" :disabled="!editable" />
             <WeightInput v-else-if="key === 'WEIGHT'" v-model="employee.WEIGHT" :disabled="!editable" />
             <input v-else v-model="employee[key]" :type="type || 'text'" :disabled="!editable" :required="key === 'NAME'" :autocomplete="key === 'NAME' ? 'name' : 'off'" />
+            <small v-if="['NAME', 'BIRTHDATE'].includes(key)" class="field-hint">{{ t('As per SSC/Dakhil certificate') }}</small>
           </div>
 
           <div class="field">
@@ -680,6 +681,7 @@ onMounted(async () => {
             />
             <DateInput v-else-if="type === 'date'" v-model="employee[key]" :disabled="!editable" />
             <input v-else v-model="employee[key]" :disabled="!editable" />
+            <small v-if="key === 'FATHER_NAME'" class="field-hint">{{ t('As per SSC/Dakhil certificate') }}</small>
           </div>
         </div>
 

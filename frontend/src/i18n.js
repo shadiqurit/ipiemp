@@ -50,6 +50,7 @@ const bn = {
   'Class ID': 'ক্লাস আইডি',
   'IPI': 'আইপিআই',
   'Employee Name': 'নাম',
+  'As per SSC/Dakhil certificate': 'এসএসসি/দাখিল সনদ অনুযায়ী',
   'Birth Date': 'জন্ম তারিখ',
   'Blood Group': 'রক্তের গ্রুপ',
   'Nationality': 'জাতীয়তা',
