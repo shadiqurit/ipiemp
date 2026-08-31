@@ -20,12 +20,14 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import LanguageToggle from './components/LanguageToggle.vue';
 import NotificationCenter from './components/NotificationCenter.vue';
 import { t } from './i18n';
+import { clearNotifications } from './utils/notifications';
 
 const route = useRoute();
 const showHomeButton = computed(() => route.path !== '/');
+watch(() => route.fullPath, clearNotifications);
 </script>

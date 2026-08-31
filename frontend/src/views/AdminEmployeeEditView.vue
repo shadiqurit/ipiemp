@@ -10,7 +10,7 @@ import EducationLevels from '../components/EducationLevels.vue';
 import HeightInput from '../components/HeightInput.vue';
 import WeightInput from '../components/WeightInput.vue';
 import { normalizeEducationRows } from '../utils/education';
-import { notifyError, notifySuccess } from '../utils/notifications';
+import { clearNotifications, notifyError, notifySuccess } from '../utils/notifications';
 import { t } from '../i18n';
 
 const props = defineProps({ empEntryId: { type: String, required: true } });
@@ -34,6 +34,11 @@ const approvalOptions = computed(() => [
 const batchOptions = computed(() => batches.value.map(batch => ({ value: batch.BATCH_NO, label: `${batch.BATCH_NO} (${batch.STATUS})` })));
 
 if (token) setAdminToken(token);
+
+function clearActionFeedback() {
+  message.value = '';
+  clearNotifications();
+}
 
 function onMaritalStatusChange() {
   if (employee.MARITAL_STATUS !== 'M') {
@@ -63,12 +68,14 @@ async function load() {
     education.value = normalizeEducationRows(employeeResponse.data.education);
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Employee details could not be loaded');
   } finally {
     loading.value = false;
   }
 }
 
 async function save() {
+  clearActionFeedback();
   saving.value = true;
   try {
     const { data } = await api.put(`/admin/employees/${props.empEntryId}`, {
@@ -77,8 +84,7 @@ async function save() {
       approvalStatus: approvalStatus.value,
       education: education.value
     });
-    message.value = data.message;
-    notifySuccess(message.value, 'Employee updated');
+    notifySuccess(data.message, 'Employee updated');
     await load();
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
@@ -92,7 +98,7 @@ onMounted(load);
 </script>
 
 <template>
-  <main class="page">
+  <main class="page" @click.capture="clearActionFeedback">
     <section class="hero">
       <div>
         <span class="badge">{{ t('Admin') }}</span>
@@ -105,7 +111,6 @@ onMounted(load);
       <router-link class="button-link" to="/admin">← {{ t('Back to Employee List') }}</router-link>
     </section>
 
-    <div v-if="message" class="notice">{{ message }}</div>
     <section v-if="loading" class="card">Loading employee details…</section>
 
     <form v-else class="form" novalidate @submit.prevent="save">

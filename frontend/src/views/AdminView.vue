@@ -10,7 +10,7 @@ import HeightInput from '../components/HeightInput.vue';
 import WeightInput from '../components/WeightInput.vue';
 import { formatDateTime } from '../utils/dates';
 import { normalizeEducationRows } from '../utils/education';
-import { notifyError, notifySuccess } from '../utils/notifications';
+import { clearNotifications, notifyError, notifySuccess } from '../utils/notifications';
 import { t } from '../i18n';
 
 const token = ref(localStorage.getItem('admin_token') || '');
@@ -78,7 +78,13 @@ function onEditMaritalStatusChange() {
 
 if (token.value) setAdminToken(token.value);
 
+function clearActionFeedback() {
+  message.value = '';
+  clearNotifications();
+}
+
 async function login() {
+  clearActionFeedback();
   try {
     const { data } = await api.post('/admin/login', { username: username.value, password: password.value });
     token.value = data.token;
@@ -89,6 +95,7 @@ async function login() {
     await refresh();
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Login failed');
   }
 }
 
@@ -116,11 +123,13 @@ async function refresh() {
     if (!isSuperAdmin.value && activeSection.value === 'users') activeSection.value = 'employees';
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, e.response?.status === 401 ? 'Session ended' : 'Data could not be refreshed');
     if (e.response?.status === 401) logout();
   }
 }
 
 async function createUser() {
+  clearActionFeedback();
   try {
     const { data } = await api.post('/admin/users', newUser);
     message.value = data.message;
@@ -148,6 +157,7 @@ function openEditUserModal(user) {
 }
 
 async function updateUser() {
+  clearActionFeedback();
   try {
     const { data } = await api.put(`/admin/users/${editUser.userId}`, {
       username: editUser.username,
@@ -165,6 +175,7 @@ async function updateUser() {
 }
 
 async function deleteUser(user) {
+  clearActionFeedback();
   if (!window.confirm(`Permanently delete user "${user.USERNAME}"?`)) return;
   try {
     const { data } = await api.delete(`/admin/users/${user.USER_ID}`);
@@ -177,6 +188,7 @@ async function deleteUser(user) {
 }
 
 async function updateUserPassword() {
+  clearActionFeedback();
   if (!selectedUser.value) return;
   try {
     const { data } = await api.patch(
@@ -195,6 +207,7 @@ async function updateUserPassword() {
 }
 
 async function addBatch() {
+  clearActionFeedback();
   try {
     await api.post('/admin/batches', { batchNo: newBatch.value });
     notifySuccess('The new batch was added successfully.', 'Batch created');
@@ -207,6 +220,7 @@ async function addBatch() {
 }
 
 async function setBatch(batchNo, status) {
+  clearActionFeedback();
   try {
     await api.patch(`/admin/batches/${encodeURIComponent(batchNo)}/status`, { status });
     notifySuccess(`Batch ${batchNo} is now ${status.toLowerCase()}.`, 'Batch updated');
@@ -225,6 +239,7 @@ function openOwnPasswordModal() {
 }
 
 async function changeOwnPassword() {
+  clearActionFeedback();
   if (ownPassword.newPassword !== ownPassword.confirmPassword) {
     message.value = 'New password and confirmation do not match.';
     notifyError(message.value, 'Password could not be changed');
@@ -255,6 +270,7 @@ function openBatchModal(batch) {
 }
 
 async function updateBatch() {
+  clearActionFeedback();
   try {
     const { data } = await api.put(
       `/admin/batches/${encodeURIComponent(batchEditor.originalBatchNo)}`,
@@ -273,6 +289,7 @@ async function updateBatch() {
 }
 
 async function deleteBatch(batchNo) {
+  clearActionFeedback();
   if (!window.confirm(`Permanently delete batch "${batchNo}"? Only empty batches can be deleted.`)) return;
   try {
     const { data } = await api.delete(`/admin/batches/${encodeURIComponent(batchNo)}`);
@@ -285,6 +302,7 @@ async function deleteBatch(batchNo) {
 }
 
 async function approveEmployee(employee, approvalStatus) {
+  clearActionFeedback();
   if (employee.APPROVAL_STATUS === 'DRAFT') {
     const draftMessage = 'This entry is still a draft. The employee must submit the completed form before it can be approved.';
     message.value = draftMessage;
@@ -304,6 +322,7 @@ async function approveEmployee(employee, approvalStatus) {
 }
 
 async function assignIpi(employee) {
+  clearActionFeedback();
   const ipi = window.prompt(`Assign IPI\nMerit List ID: ${employee.MERITLIST_ID}\nClass ID: ${employee.CLASS_ID}`, employee.IPI || '');
   if (ipi === null) return;
   try {
@@ -318,6 +337,7 @@ async function assignIpi(employee) {
 }
 
 async function deleteEmployee(employee) {
+  clearActionFeedback();
   const label = employee.NAME || `${employee.MERITLIST_ID} / ${employee.CLASS_ID}`;
   if (!window.confirm(`Permanently delete all information for "${label}"? This cannot be undone.`)) return;
   try {
@@ -331,6 +351,7 @@ async function deleteEmployee(employee) {
 }
 
 async function openEmployeeEditor(employee) {
+  clearActionFeedback();
   editLoading.value = true;
   try {
     const { data } = await api.get(`/admin/employees/${employee.EMP_ENTRY_ID}`);
@@ -342,12 +363,14 @@ async function openEmployeeEditor(employee) {
     selectedEmployeeId.value = employee.EMP_ENTRY_ID;
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Employee details could not be loaded');
   } finally {
     editLoading.value = false;
   }
 }
 
 async function saveEmployeeDetails() {
+  clearActionFeedback();
   if (!selectedEmployeeId.value) return;
   editLoading.value = true;
   try {
@@ -374,6 +397,7 @@ function closeEmployeeEditor() {
 }
 
 async function decide(id, status) {
+  clearActionFeedback();
   const remark = window.prompt('Admin remarks (optional)') || '';
   try {
     await api.patch(`/admin/update-requests/${id}`, { status, remark });
@@ -386,6 +410,7 @@ async function decide(id, status) {
 }
 
 async function exportBatch(batchNo) {
+  clearActionFeedback();
   try {
     const response = await api.get(`/admin/export/${encodeURIComponent(batchNo)}`, { responseType: 'blob' });
     const url = URL.createObjectURL(response.data);
@@ -398,6 +423,7 @@ async function exportBatch(batchNo) {
     URL.revokeObjectURL(url);
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Excel export failed');
   }
 }
 
@@ -426,7 +452,7 @@ onMounted(refresh);
 </script>
 
 <template>
-  <main class="page">
+  <main class="page" @click.capture="clearActionFeedback">
     <section class="hero">
       <div>
         <span class="badge">{{ t('Admin') }}</span>
@@ -434,8 +460,6 @@ onMounted(refresh);
         <p v-if="token">Manage administrator access, employees and update requests.</p>
       </div>
     </section>
-
-    <div v-if="message" class="notice">{{ message }}</div>
 
     <section v-if="!token" class="card auth">
       <h2>{{ t('Admin Login') }}</h2>

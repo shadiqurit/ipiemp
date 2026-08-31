@@ -14,9 +14,20 @@ export function dismissNotification(id) {
   timers.delete(id);
 }
 
+export function clearNotifications() {
+  for (const id of [...timers.keys()]) {
+    clearTimeout(timers.get(id));
+  }
+  timers.clear();
+  notifications.splice(0, notifications.length);
+}
+
 export function showNotification(message, options = {}) {
   const text = String(message || '').trim();
   if (!text) return null;
+
+  // Feedback represents the latest action; do not stack obsolete results.
+  clearNotifications();
 
   const notification = {
     id: nextId++,
