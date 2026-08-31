@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import ExcelJS from 'exceljs';
 import { pool } from '../db.js';
-import { requireAdmin, signAdmin } from '../auth.js';
+import { requireAdmin, requireSuperAdmin, signAdmin } from '../auth.js';
 import { normalizeAndValidateEmployeePhones } from '../utils/phones.js';
 import { validateAndNormalizeEducation } from '../utils/education.js';
 import { normalizeAndValidateMeasurements } from '../utils/measurements.js';
@@ -57,6 +57,10 @@ function validateEmployee(employee, { required = false } = {}) {
   }
 }
 
+function normalizeUserType(value) {
+  return String(value || '').trim().toUpperCase().replace(/[ -]+/g, '_');
+}
+
 router.post('/login', async (req, res, next) => {
   try {
     const username = String(req.body?.username || '').trim();
@@ -83,7 +87,8 @@ router.post('/login', async (req, res, next) => {
       token: signAdmin(user),
       user: {
         username: user.USERNAME,
-        displayName: user.DISPLAY_NAME
+        displayName: user.DISPLAY_NAME,
+        userType: user.USER_TYPE
       }
     });
 
@@ -94,10 +99,19 @@ router.post('/login', async (req, res, next) => {
 
 router.use(requireAdmin);
 
-router.get('/users', async (req, res, next) => {
+router.get('/me', (req, res) => {
+  res.json({
+    userId: req.admin.userId,
+    username: req.admin.username,
+    displayName: req.admin.name,
+    userType: req.admin.userType
+  });
+});
+
+router.get('/users', requireSuperAdmin, async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      `SELECT USER_ID, USERNAME, DISPLAY_NAME, ACTIVE_YN, CREATED_AT
+      `SELECT USER_ID, USERNAME, DISPLAY_NAME, USER_TYPE, ACTIVE_YN, CREATED_AT
          FROM admin_user
         ORDER BY CREATED_AT DESC, USER_ID DESC`
     );
@@ -108,10 +122,11 @@ router.get('/users', async (req, res, next) => {
   }
 });
 
-router.post('/users', async (req, res, next) => {
+router.post('/users', requireSuperAdmin, async (req, res, next) => {
   const username = String(req.body?.username || '').trim();
   const password = String(req.body?.password || '');
   const displayName = String(req.body?.displayName || '').trim();
+  const userType = normalizeUserType(req.body?.userType || 'ADMIN');
 
   if (!/^[A-Za-z0-9._-]{3,100}$/.test(username)) {
     return res.status(400).json({
@@ -125,16 +140,20 @@ router.post('/users', async (req, res, next) => {
     });
   }
 
+  if (!['ADMIN', 'SUPER_ADMIN'].includes(userType)) {
+    return res.status(400).json({ message: 'User type must be Admin or Super Admin.' });
+  }
+
   try {
     const hash = await bcrypt.hash(password, 12);
 
     await pool.execute(
-      `INSERT INTO admin_user (USERNAME, PASSWORD_HASH, DISPLAY_NAME)
-       VALUES (?, ?, ?)`,
-      [username, hash, displayName || username]
+      `INSERT INTO admin_user (USERNAME, PASSWORD_HASH, DISPLAY_NAME, USER_TYPE)
+       VALUES (?, ?, ?, ?)`,
+      [username, hash, displayName || username, userType]
     );
 
-    res.status(201).json({ ok: true, message: 'Admin user created.' });
+    res.status(201).json({ ok: true, message: `${userType === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'} user created.` });
   } catch (e) {
     if (e.code === 'ER_DUP_ENTRY') {
       e.status = 409;
@@ -144,7 +163,83 @@ router.post('/users', async (req, res, next) => {
   }
 });
 
-router.patch('/users/:userId/password', async (req, res, next) => {
+router.put('/users/:userId', requireSuperAdmin, async (req, res, next) => {
+  const userId = Number(req.params.userId);
+  const username = String(req.body?.username || '').trim();
+  const displayName = String(req.body?.displayName || '').trim();
+  const userType = normalizeUserType(req.body?.userType);
+  const activeYn = String(req.body?.activeYn || '').toUpperCase();
+
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return res.status(400).json({ message: 'Invalid user ID.' });
+  }
+  if (!/^[A-Za-z0-9._-]{3,100}$/.test(username)) {
+    return res.status(400).json({ message: 'Username must be 3–100 characters and use letters, numbers, dot, dash or underscore only.' });
+  }
+  if (!['ADMIN', 'SUPER_ADMIN'].includes(userType)) {
+    return res.status(400).json({ message: 'User type must be Admin or Super Admin.' });
+  }
+  if (!['Y', 'N'].includes(activeYn)) {
+    return res.status(400).json({ message: 'User status must be active or inactive.' });
+  }
+  if (userId === req.admin.userId && activeYn === 'N') {
+    return res.status(409).json({ message: 'You cannot deactivate your own account.' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query(
+      `SELECT USER_ID FROM admin_user
+        WHERE USER_TYPE = 'SUPER_ADMIN' AND ACTIVE_YN = 'Y'
+        FOR UPDATE`
+    );
+    const [rows] = await conn.execute(
+      `SELECT USER_TYPE, ACTIVE_YN FROM admin_user WHERE USER_ID = ? FOR UPDATE`,
+      [userId]
+    );
+    const existing = rows[0];
+    if (!existing) {
+      await conn.rollback();
+      return res.status(404).json({ message: 'Admin user not found.' });
+    }
+
+    const removesActiveSuperAdmin = existing.USER_TYPE === 'SUPER_ADMIN'
+      && existing.ACTIVE_YN === 'Y'
+      && (userType !== 'SUPER_ADMIN' || activeYn !== 'Y');
+    if (removesActiveSuperAdmin) {
+      const [counts] = await conn.execute(
+        `SELECT COUNT(*) AS total FROM admin_user
+          WHERE USER_TYPE = 'SUPER_ADMIN' AND ACTIVE_YN = 'Y' AND USER_ID <> ?`,
+        [userId]
+      );
+      if (!Number(counts[0].total)) {
+        await conn.rollback();
+        return res.status(409).json({ message: 'At least one active Super Admin must remain.' });
+      }
+    }
+
+    await conn.execute(
+      `UPDATE admin_user
+          SET USERNAME = ?, DISPLAY_NAME = ?, USER_TYPE = ?, ACTIVE_YN = ?
+        WHERE USER_ID = ?`,
+      [username, displayName || username, userType, activeYn, userId]
+    );
+    await conn.commit();
+    res.json({ ok: true, message: 'User updated.' });
+  } catch (e) {
+    await conn.rollback();
+    if (e.code === 'ER_DUP_ENTRY') {
+      e.status = 409;
+      e.message = 'This username already exists.';
+    }
+    next(e);
+  } finally {
+    conn.release();
+  }
+});
+
+router.patch('/users/:userId/password', requireSuperAdmin, async (req, res, next) => {
   const userId = Number(req.params.userId);
   const password = String(req.body?.password || '');
 
@@ -162,7 +257,7 @@ router.patch('/users/:userId/password', async (req, res, next) => {
     const hash = await bcrypt.hash(password, 12);
     const [result] = await pool.execute(
       `UPDATE admin_user
-          SET PASSWORD_HASH = ?, ACTIVE_YN = 'Y'
+          SET PASSWORD_HASH = ?
         WHERE USER_ID = ?`,
       [hash, userId]
     );
@@ -174,6 +269,55 @@ router.patch('/users/:userId/password', async (req, res, next) => {
     res.json({ ok: true, message: 'User password updated.' });
   } catch (e) {
     next(e);
+  }
+});
+
+router.delete('/users/:userId', requireSuperAdmin, async (req, res, next) => {
+  const userId = Number(req.params.userId);
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return res.status(400).json({ message: 'Invalid user ID.' });
+  }
+  if (userId === req.admin.userId) {
+    return res.status(409).json({ message: 'You cannot delete your own account.' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query(
+      `SELECT USER_ID FROM admin_user
+        WHERE USER_TYPE = 'SUPER_ADMIN' AND ACTIVE_YN = 'Y'
+        FOR UPDATE`
+    );
+    const [rows] = await conn.execute(
+      `SELECT USER_TYPE, ACTIVE_YN FROM admin_user WHERE USER_ID = ? FOR UPDATE`,
+      [userId]
+    );
+    const existing = rows[0];
+    if (!existing) {
+      await conn.rollback();
+      return res.status(404).json({ message: 'Admin user not found.' });
+    }
+    if (existing.USER_TYPE === 'SUPER_ADMIN' && existing.ACTIVE_YN === 'Y') {
+      const [counts] = await conn.execute(
+        `SELECT COUNT(*) AS total FROM admin_user
+          WHERE USER_TYPE = 'SUPER_ADMIN' AND ACTIVE_YN = 'Y' AND USER_ID <> ?`,
+        [userId]
+      );
+      if (!Number(counts[0].total)) {
+        await conn.rollback();
+        return res.status(409).json({ message: 'At least one active Super Admin must remain.' });
+      }
+    }
+
+    await conn.execute(`DELETE FROM admin_user WHERE USER_ID = ?`, [userId]);
+    await conn.commit();
+    res.json({ ok: true, message: 'User deleted.' });
+  } catch (e) {
+    await conn.rollback();
+    next(e);
+  } finally {
+    conn.release();
   }
 });
 
@@ -277,6 +421,26 @@ router.patch('/batches/:batchNo/status', async (req, res, next) => {
   }
 });
 
+router.delete('/batches/:batchNo', requireSuperAdmin, async (req, res, next) => {
+  const batchNo = String(req.params.batchNo || '').trim();
+  if (!batchNo) return res.status(400).json({ message: 'Batch number is required.' });
+
+  try {
+    const [result] = await pool.execute(
+      `DELETE FROM hr_batch_control WHERE BATCH_NO = ?`,
+      [batchNo]
+    );
+    if (!result.affectedRows) return res.status(404).json({ message: 'Batch not found.' });
+    res.json({ ok: true, message: 'Batch deleted.' });
+  } catch (e) {
+    if (e.code === 'ER_ROW_IS_REFERENCED_2' || e.code === 'ER_ROW_IS_REFERENCED') {
+      e.status = 409;
+      e.message = 'This batch contains employee or update-request records and cannot be deleted.';
+    }
+    next(e);
+  }
+});
+
 /**
  * List employee records so admin can assign IPI using Merit List ID + Class ID.
  */
@@ -361,6 +525,31 @@ router.get('/employees/:empEntryId', async (req, res, next) => {
     res.json({ employee: employees[0], education });
   } catch (e) {
     next(e);
+  }
+});
+
+router.delete('/employees/:empEntryId', requireSuperAdmin, async (req, res, next) => {
+  const empEntryId = Number(req.params.empEntryId);
+  if (!Number.isInteger(empEntryId) || empEntryId <= 0) {
+    return res.status(400).json({ message: 'Invalid employee entry ID.' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.execute(`DELETE FROM hr_update_request WHERE EMP_ENTRY_ID = ?`, [empEntryId]);
+    const [result] = await conn.execute(`DELETE FROM up_emp WHERE EMP_ENTRY_ID = ?`, [empEntryId]);
+    if (!result.affectedRows) {
+      await conn.rollback();
+      return res.status(404).json({ message: 'Employee record not found.' });
+    }
+    await conn.commit();
+    res.json({ ok: true, message: 'Employee information deleted.' });
+  } catch (e) {
+    await conn.rollback();
+    next(e);
+  } finally {
+    conn.release();
   }
 });
 

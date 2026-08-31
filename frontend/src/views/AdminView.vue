@@ -18,6 +18,8 @@ const username = ref('');
 const password = ref('');
 const message = ref('');
 const activeSection = ref('employees');
+const currentUser = ref(null);
+const isSuperAdmin = computed(() => currentUser.value?.userType === 'SUPER_ADMIN');
 const users = ref([]);
 const batches = ref([]);
 const requests = ref([]);
@@ -26,8 +28,10 @@ const newBatch = ref('');
 const employeeBatchFilter = ref('');
 const employeeSearch = ref('');
 const batchFilterOptions = computed(() => batches.value.map(batch => ({ value: batch.BATCH_NO, label: `${batch.BATCH_NO} (${batch.STATUS})` })));
-const newUser = reactive({ username: '', displayName: '', password: '' });
+const newUser = reactive({ username: '', displayName: '', password: '', userType: 'ADMIN' });
 const userModalOpen = ref(false);
+const editUserModalOpen = ref(false);
+const editUser = reactive({ userId: null, username: '', displayName: '', userType: 'ADMIN', activeYn: 'Y' });
 const passwordModalOpen = ref(false);
 const selectedUser = ref(null);
 const replacementPassword = ref('');
@@ -74,6 +78,7 @@ async function login() {
   try {
     const { data } = await api.post('/admin/login', { username: username.value, password: password.value });
     token.value = data.token;
+    currentUser.value = data.user;
     localStorage.setItem('admin_token', token.value);
     setAdminToken(token.value);
     password.value = '';
@@ -86,8 +91,9 @@ async function login() {
 async function refresh() {
   if (!token.value) return;
   try {
-    const [u, b, r, e] = await Promise.all([
-      api.get('/admin/users'),
+    const me = await api.get('/admin/me');
+    currentUser.value = me.data;
+    const requestsToLoad = [
       api.get('/admin/batches'),
       api.get('/admin/update-requests'),
       api.get('/admin/employees', {
@@ -96,13 +102,17 @@ async function refresh() {
           ...(employeeSearch.value.trim() ? { search: employeeSearch.value.trim() } : {})
         }
       })
-    ]);
-    users.value = u.data;
+    ];
+    if (isSuperAdmin.value) requestsToLoad.push(api.get('/admin/users'));
+    const [b, r, e, u] = await Promise.all(requestsToLoad);
     batches.value = b.data;
     requests.value = r.data;
     employees.value = e.data;
+    users.value = u?.data || [];
+    if (!isSuperAdmin.value && activeSection.value === 'users') activeSection.value = 'employees';
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
+    if (e.response?.status === 401) logout();
   }
 }
 
@@ -114,12 +124,51 @@ async function createUser() {
     newUser.username = '';
     newUser.displayName = '';
     newUser.password = '';
+    newUser.userType = 'ADMIN';
     await refresh();
     userModalOpen.value = false;
     activeSection.value = 'users';
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
     notifyError(message.value, 'User could not be created');
+  }
+}
+
+function openEditUserModal(user) {
+  editUser.userId = user.USER_ID;
+  editUser.username = user.USERNAME;
+  editUser.displayName = user.DISPLAY_NAME;
+  editUser.userType = user.USER_TYPE;
+  editUser.activeYn = user.ACTIVE_YN;
+  editUserModalOpen.value = true;
+}
+
+async function updateUser() {
+  try {
+    const { data } = await api.put(`/admin/users/${editUser.userId}`, {
+      username: editUser.username,
+      displayName: editUser.displayName,
+      userType: editUser.userType,
+      activeYn: editUser.activeYn
+    });
+    notifySuccess(data.message, 'User updated');
+    editUserModalOpen.value = false;
+    await refresh();
+  } catch (e) {
+    message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'User could not be updated');
+  }
+}
+
+async function deleteUser(user) {
+  if (!window.confirm(`Permanently delete user "${user.USERNAME}"?`)) return;
+  try {
+    const { data } = await api.delete(`/admin/users/${user.USER_ID}`);
+    notifySuccess(data.message, 'User deleted');
+    await refresh();
+  } catch (e) {
+    message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'User could not be deleted');
   }
 }
 
@@ -164,6 +213,18 @@ async function setBatch(batchNo, status) {
   }
 }
 
+async function deleteBatch(batchNo) {
+  if (!window.confirm(`Permanently delete batch "${batchNo}"? Only empty batches can be deleted.`)) return;
+  try {
+    const { data } = await api.delete(`/admin/batches/${encodeURIComponent(batchNo)}`);
+    notifySuccess(data.message, 'Batch deleted');
+    await refresh();
+  } catch (e) {
+    message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Batch could not be deleted');
+  }
+}
+
 async function approveEmployee(employee, approvalStatus) {
   if (employee.APPROVAL_STATUS === 'DRAFT') {
     const draftMessage = 'This entry is still a draft. The employee must submit the completed form before it can be approved.';
@@ -194,6 +255,19 @@ async function assignIpi(employee) {
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
     notifyError(message.value, 'IPI could not be assigned');
+  }
+}
+
+async function deleteEmployee(employee) {
+  const label = employee.NAME || `${employee.MERITLIST_ID} / ${employee.CLASS_ID}`;
+  if (!window.confirm(`Permanently delete all information for "${label}"? This cannot be undone.`)) return;
+  try {
+    const { data } = await api.delete(`/admin/employees/${employee.EMP_ENTRY_ID}`);
+    notifySuccess(data.message, 'Employee deleted');
+    await refresh();
+  } catch (e) {
+    message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Employee could not be deleted');
   }
 }
 
@@ -270,6 +344,7 @@ async function exportBatch(batchNo) {
 
 function logout() {
   token.value = '';
+  currentUser.value = null;
   localStorage.removeItem('admin_token');
   setAdminToken('');
 }
@@ -278,6 +353,7 @@ function openUserModal() {
   newUser.username = '';
   newUser.displayName = '';
   newUser.password = '';
+  newUser.userType = 'ADMIN';
   userModalOpen.value = true;
 }
 
@@ -311,37 +387,50 @@ onMounted(refresh);
 
     <template v-else>
       <section class="toolbar">
+        <span>{{ currentUser?.displayName || currentUser?.username }} · {{ isSuperAdmin ? t('Super Admin') : t('Admin') }}</span>
         <router-link to="/">{{ t('Public Form') }}</router-link>
         <button @click="refresh">{{ t('Refresh') }}</button>
         <button @click="logout">{{ t('Logout') }}</button>
       </section>
 
       <nav class="admin-menu" aria-label="Admin menu">
-        <button :class="{ active: activeSection === 'users' }" @click="activeSection = 'users'">{{ t('User List') }}</button>
+        <button v-if="isSuperAdmin" :class="{ active: activeSection === 'users' }" @click="activeSection = 'users'">{{ t('User List') }}</button>
         <button :class="{ active: activeSection === 'batches' }" @click="activeSection = 'batches'">{{ t('Batch Control') }}</button>
         <button :class="{ active: activeSection === 'employees' }" @click="activeSection = 'employees'">{{ t('Employee List') }}</button>
         <button :class="{ active: activeSection === 'requests' }" @click="activeSection = 'requests'">{{ t('Update Requests') }}</button>
       </nav>
 
-      <section v-if="activeSection === 'users'" class="card">
-        <div class="section-title"><div><h2>{{ t('User List') }}</h2><span>{{ users.length }} administrator(s)</span></div><button class="primary" @click="openUserModal">{{ t('Create User') }}</button></div>
+      <section v-if="isSuperAdmin && activeSection === 'users'" class="card">
+        <div class="section-title"><div><h2>{{ t('User List') }}</h2><span>{{ users.length }} user(s)</span></div><button class="primary" @click="openUserModal">{{ t('Create User') }}</button></div>
         <div class="table-wrap"><table>
-          <thead><tr><th>{{ t('Username') }}</th><th>{{ t('Display Name') }}</th><th>{{ t('Status') }}</th><th>{{ t('Created') }}</th><th>{{ t('Action') }}</th></tr></thead>
+          <thead><tr><th>{{ t('Username') }}</th><th>{{ t('Display Name') }}</th><th>{{ t('User Type') }}</th><th>{{ t('Status') }}</th><th>{{ t('Created') }}</th><th>{{ t('Action') }}</th></tr></thead>
           <tbody>
-            <tr v-for="user in users" :key="user.USER_ID"><td>{{ user.USERNAME }}</td><td>{{ user.DISPLAY_NAME }}</td><td>{{ t(user.ACTIVE_YN === 'Y' ? 'Active' : 'Inactive') }}</td><td>{{ formatDateTime(user.CREATED_AT) }}</td><td><button @click="openPasswordModal(user)">{{ t('Update Password') }}</button></td></tr>
-            <tr v-if="!users.length"><td colspan="5">No administrators found.</td></tr>
+            <tr v-for="user in users" :key="user.USER_ID"><td>{{ user.USERNAME }}</td><td>{{ user.DISPLAY_NAME }}</td><td>{{ t(user.USER_TYPE === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin') }}</td><td>{{ t(user.ACTIVE_YN === 'Y' ? 'Active' : 'Inactive') }}</td><td>{{ formatDateTime(user.CREATED_AT) }}</td><td class="actions-cell"><button @click="openEditUserModal(user)">{{ t('Edit') }}</button><button @click="openPasswordModal(user)">{{ t('Update Password') }}</button><button class="danger" @click="deleteUser(user)">{{ t('Delete') }}</button></td></tr>
+            <tr v-if="!users.length"><td colspan="6">No users found.</td></tr>
           </tbody>
         </table></div>
       </section>
 
       <div v-if="userModalOpen" class="modal-backdrop" @click.self="userModalOpen = false">
         <section class="card modal" role="dialog" aria-modal="true" aria-labelledby="create-user-title">
-          <div class="section-title"><h2 id="create-user-title">{{ t('Create Admin User') }}</h2><button type="button" @click="userModalOpen = false">{{ t('Close') }}</button></div>
+          <div class="section-title"><h2 id="create-user-title">{{ t('Create User') }}</h2><button type="button" @click="userModalOpen = false">{{ t('Close') }}</button></div>
           <p class="muted">Usernames can contain letters, numbers, dot, dash and underscore. Passwords need at least 8 characters.</p>
           <label>{{ t('Username') }}</label><input v-model="newUser.username" autocomplete="username" />
           <label>{{ t('Display Name') }}</label><input v-model="newUser.displayName" autocomplete="name" />
+          <label>{{ t('User Type') }}</label><select v-model="newUser.userType"><option value="ADMIN">{{ t('Admin') }}</option><option value="SUPER_ADMIN">{{ t('Super Admin') }}</option></select>
           <label>{{ t('Password') }}</label><input v-model="newUser.password" type="password" autocomplete="new-password" @keyup.enter="createUser" />
           <div class="modal-actions"><button type="button" @click="userModalOpen = false">{{ t('Cancel') }}</button><button class="primary" @click="createUser">{{ t('Create User') }}</button></div>
+        </section>
+      </div>
+
+      <div v-if="editUserModalOpen" class="modal-backdrop" @click.self="editUserModalOpen = false">
+        <section class="card modal" role="dialog" aria-modal="true" aria-labelledby="edit-user-title">
+          <div class="section-title"><h2 id="edit-user-title">{{ t('Edit User') }}</h2><button type="button" @click="editUserModalOpen = false">{{ t('Close') }}</button></div>
+          <label>{{ t('Username') }}</label><input v-model="editUser.username" autocomplete="username" />
+          <label>{{ t('Display Name') }}</label><input v-model="editUser.displayName" autocomplete="name" />
+          <label>{{ t('User Type') }}</label><select v-model="editUser.userType"><option value="ADMIN">{{ t('Admin') }}</option><option value="SUPER_ADMIN">{{ t('Super Admin') }}</option></select>
+          <label>{{ t('Status') }}</label><select v-model="editUser.activeYn"><option value="Y">{{ t('Active') }}</option><option value="N">{{ t('Inactive') }}</option></select>
+          <div class="modal-actions"><button type="button" @click="editUserModalOpen = false">{{ t('Cancel') }}</button><button class="primary" @click="updateUser">{{ t('Save Changes') }}</button></div>
         </section>
       </div>
 
@@ -361,7 +450,7 @@ onMounted(refresh);
         <div class="table-wrap"><table>
           <thead><tr><th>{{ t('Batch') }}</th><th>{{ t('Status') }}</th><th>{{ t('Actions') }}</th></tr></thead>
           <tbody>
-            <tr v-for="batch in batches" :key="batch.BATCH_NO"><td>{{ batch.BATCH_NO }}</td><td>{{ t(batch.STATUS) }}</td><td class="actions-cell"><button v-if="batch.STATUS !== 'ACTIVE'" @click="setBatch(batch.BATCH_NO, 'ACTIVE')">{{ t('Activate') }}</button><button v-else @click="setBatch(batch.BATCH_NO, 'INACTIVE')">{{ t('Deactivate') }}</button><button @click="exportBatch(batch.BATCH_NO)">{{ t('Excel') }}</button></td></tr>
+            <tr v-for="batch in batches" :key="batch.BATCH_NO"><td>{{ batch.BATCH_NO }}</td><td>{{ t(batch.STATUS) }}</td><td class="actions-cell"><button v-if="batch.STATUS !== 'ACTIVE'" @click="setBatch(batch.BATCH_NO, 'ACTIVE')">{{ t('Activate') }}</button><button v-else @click="setBatch(batch.BATCH_NO, 'INACTIVE')">{{ t('Deactivate') }}</button><button @click="exportBatch(batch.BATCH_NO)">{{ t('Excel') }}</button><button v-if="isSuperAdmin" class="danger" @click="deleteBatch(batch.BATCH_NO)">{{ t('Delete') }}</button></td></tr>
             <tr v-if="!batches.length"><td colspan="3">No batches found.</td></tr>
           </tbody>
         </table></div>
@@ -372,7 +461,7 @@ onMounted(refresh);
           <div class="table-wrap"><table>
             <thead><tr><th>{{ t('Merit List ID') }}</th><th>{{ t('Class ID') }}</th><th>{{ t('Name') }}</th><th>{{ t('Phone') }}</th><th>{{ t('Batch') }}</th><th>{{ t('Approval Status') }}</th><th>{{ t('IPI') }}</th><th>{{ t('Actions') }}</th></tr></thead>
             <tbody>
-              <tr v-for="employee in employees" :key="employee.EMP_ENTRY_ID"><td>{{ employee.MERITLIST_ID }}</td><td>{{ employee.CLASS_ID }}</td><td>{{ employee.NAME }}</td><td>{{ employee.PHONE }}</td><td>{{ employee.batch_no }}</td><td>{{ t(employee.APPROVAL_STATUS === 'DRAFT' ? 'Draft' : employee.APPROVAL_STATUS === 'PENDING' ? 'Pending' : employee.APPROVAL_STATUS === 'APPROVED' ? 'Approved' : 'Rejected') }}<small v-if="employee.APPROVAL_STATUS === 'DRAFT'" class="status-note">{{ t('Waiting for employee submission') }}</small></td><td>{{ employee.IPI || t('Not assigned') }}</td><td class="actions-cell"><router-link class="button-link" :to="{ name: 'admin-employee-edit', params: { empEntryId: employee.EMP_ENTRY_ID } }">{{ t('Edit Details') }}</router-link><button v-if="['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)" class="primary" @click="approveEmployee(employee, 'APPROVED')">{{ t('Approve') }}</button><button v-if="employee.APPROVAL_STATUS === 'PENDING'" class="danger" @click="approveEmployee(employee, 'REJECTED')">{{ t('Reject') }}</button><button @click="assignIpi(employee)">{{ t(employee.IPI ? 'Change IPI' : 'Assign IPI') }}</button></td></tr>
+              <tr v-for="employee in employees" :key="employee.EMP_ENTRY_ID"><td>{{ employee.MERITLIST_ID }}</td><td>{{ employee.CLASS_ID }}</td><td>{{ employee.NAME }}</td><td>{{ employee.PHONE }}</td><td>{{ employee.batch_no }}</td><td>{{ t(employee.APPROVAL_STATUS === 'DRAFT' ? 'Draft' : employee.APPROVAL_STATUS === 'PENDING' ? 'Pending' : employee.APPROVAL_STATUS === 'APPROVED' ? 'Approved' : 'Rejected') }}<small v-if="employee.APPROVAL_STATUS === 'DRAFT'" class="status-note">{{ t('Waiting for employee submission') }}</small></td><td>{{ employee.IPI || t('Not assigned') }}</td><td class="actions-cell"><router-link class="button-link" :to="{ name: 'admin-employee-edit', params: { empEntryId: employee.EMP_ENTRY_ID } }">{{ t('Edit Details') }}</router-link><button v-if="['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)" class="primary" @click="approveEmployee(employee, 'APPROVED')">{{ t('Approve') }}</button><button v-if="employee.APPROVAL_STATUS === 'PENDING'" class="danger" @click="approveEmployee(employee, 'REJECTED')">{{ t('Reject') }}</button><button @click="assignIpi(employee)">{{ t(employee.IPI ? 'Change IPI' : 'Assign IPI') }}</button><button v-if="isSuperAdmin" class="danger" @click="deleteEmployee(employee)">{{ t('Delete') }}</button></td></tr>
               <tr v-if="!employees.length"><td colspan="8">No employees found.</td></tr>
             </tbody>
           </table></div>

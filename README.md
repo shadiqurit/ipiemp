@@ -310,6 +310,24 @@ may be reused in a different batch. For an existing database, run
 `database/migration_batch_employee_identity.sql` once before deploying the
 matching backend.
 
+## Existing database: Admin and Super Admin user types
+
+Super Admin accounts can create, edit, activate/deactivate, reset passwords,
+and delete administrator accounts. They can also permanently delete empty
+batches and employee records. Admin accounts retain employee, batch, approval,
+request, and export access but cannot manage users or perform permanent deletes.
+
+For an existing database, run
+`database/migration_add_admin_user_types.sql` once before deploying this change.
+The migration promotes existing administrator accounts to Super Admin so user
+management remains accessible. New command-line accounts default to Super Admin;
+an explicit type can be supplied as the final argument:
+
+```bash
+npm run admin:create -- username password "Display Name" ADMIN
+npm run admin:create -- username password "Display Name" SUPER_ADMIN
+```
+
 ## Existing database: public draft saving
 
 New-employee forms can be saved as incomplete drafts and submitted later.
