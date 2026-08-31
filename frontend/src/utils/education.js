@@ -1,15 +1,15 @@
 export const EDUCATION_LEVELS = [
   'SSC / Dakhil',
   'HSC / Alim',
-  'Fazil / Honours / BA / B.Sc',
-  'Masters / Kamil'
+  'Fazil / Honours / BA / B.Sc / Degree Pass',
+  'Masters / Kamil / MBA'
 ];
 
 export const EDUCATION_LEVEL_OPTIONS = [
   ['SSC', 'Dakhil'],
   ['HSC', 'Alim'],
-  ['Fazil', 'Honours', 'BA', 'B.Sc'],
-  ['Masters', 'Kamil']
+  ['Fazil', 'Honours', 'BA', 'B.Sc', 'Degree Pass'],
+  ['Masters', 'Kamil', 'MBA']
 ];
 
 export const EDUCATION_BOARDS = [
@@ -124,8 +124,13 @@ function normalizedExamName(index, examName) {
     if (/honou?rs?/.test(lower)) return 'Honours';
     if (/b\.sc|bsc/.test(lower)) return 'B.Sc';
     if (/\bba\b/.test(lower)) return 'BA';
+    if (/degree\s*pass/.test(lower)) return 'Degree Pass';
   }
-  if (index === 3) return /kamil/.test(lower) ? 'Kamil' : /master|\bma\b|m\.sc|msc|mba|m\.com|mcom|mbs|mss/.test(lower) ? 'Masters' : '';
+  if (index === 3) {
+    if (/kamil/.test(lower)) return 'Kamil';
+    if (/\bmba\b/.test(lower)) return 'MBA';
+    return /master|\bma\b|m\.sc|msc|m\.com|mcom|mbs|mss/.test(lower) ? 'Masters' : '';
+  }
   return '';
 }
 
@@ -133,8 +138,8 @@ function levelIndex(examName) {
   const name = String(examName || '').toLowerCase();
   if (/ssc|dakhil/.test(name)) return 0;
   if (/hsc|alim/.test(name)) return 1;
-  if (/fazil|honou?rs?|\bba\b|b\.sc|bsc/.test(name)) return 2;
-  if (/master|kamil|\bma\b|m\.sc|msc|mba|m\.com|mcom|mbs|mss/.test(name)) return 3;
+  if (/fazil|honou?rs?|\bba\b|b\.sc|bsc|degree\s*pass/.test(name)) return 2;
+  if (/master|kamil|\bma\b|m\.sc|msc|\bmba\b|m\.com|mcom|mbs|mss/.test(name)) return 3;
   return -1;
 }
 

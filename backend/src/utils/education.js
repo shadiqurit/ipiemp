@@ -1,15 +1,15 @@
 export const EDUCATION_LEVELS = [
   'SSC / Dakhil',
   'HSC / Alim',
-  'Fazil / Honours / BA / B.Sc',
-  'Masters / Kamil'
+  'Fazil / Honours / BA / B.Sc / Degree Pass',
+  'Masters / Kamil / MBA'
 ];
 
 export const EDUCATION_LEVEL_OPTIONS = [
   ['SSC', 'Dakhil'],
   ['HSC', 'Alim'],
-  ['Fazil', 'Honours', 'BA', 'B.Sc'],
-  ['Masters', 'Kamil']
+  ['Fazil', 'Honours', 'BA', 'B.Sc', 'Degree Pass'],
+  ['Masters', 'Kamil', 'MBA']
 ];
 
 export const EDUCATION_BOARDS = [
@@ -90,6 +90,13 @@ export function validateAndNormalizeEducation(input, { required = true } = {}) {
     if (row.EXAMNAME && !EDUCATION_LEVEL_OPTIONS[index].includes(row.EXAMNAME)) {
       throw Object.assign(
         new Error(`${EDUCATION_LEVELS[index]}: select a valid education level.`),
+        { status: 400 }
+      );
+    }
+
+    if (row.PASSYEAR && !/^\d{4}$/.test(String(row.PASSYEAR))) {
+      throw Object.assign(
+        new Error(`${EDUCATION_LEVELS[index]}: Pass Year must contain exactly 4 digits.`),
         { status: 400 }
       );
     }
