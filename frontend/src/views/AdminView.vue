@@ -24,6 +24,9 @@ const users = ref([]);
 const batches = ref([]);
 const requests = ref([]);
 const employees = ref([]);
+const correctionModalOpen = ref(false);
+const correctionEmployee = ref(null);
+const correctionNote = ref('');
 const newBatch = ref('');
 const batchModalOpen = ref(false);
 const batchEditor = reactive({ originalBatchNo: '', batchNo: '', status: 'INACTIVE' });
@@ -350,6 +353,32 @@ async function deleteEmployee(employee) {
   }
 }
 
+function openCorrectionModal(employee) {
+  correctionEmployee.value = employee;
+  correctionNote.value = '';
+  correctionModalOpen.value = true;
+}
+
+async function grantCorrectionAccess() {
+  clearActionFeedback();
+  if (!correctionEmployee.value) return;
+  try {
+    const { data } = await api.post(
+      `/admin/employees/${correctionEmployee.value.EMP_ENTRY_ID}/correction-access`,
+      { note: correctionNote.value }
+    );
+    notifySuccess(data.message, 'Correction access granted');
+    correctionModalOpen.value = false;
+    correctionEmployee.value = null;
+    correctionNote.value = '';
+    activeSection.value = 'requests';
+    await refresh();
+  } catch (e) {
+    message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Correction access could not be granted');
+  }
+}
+
 async function openEmployeeEditor(employee) {
   clearActionFeedback();
   editLoading.value = true;
@@ -424,6 +453,22 @@ async function exportBatch(batchNo) {
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
     notifyError(message.value, 'Excel export failed');
+  }
+}
+
+async function deleteUpdateRequest(request) {
+  clearActionFeedback();
+  const warning = request.STATUS === 'APPROVED'
+    ? 'Deleting this approved log immediately removes its temporary correction access. Continue?'
+    : 'Delete this update request log?';
+  if (!window.confirm(warning)) return;
+  try {
+    const { data } = await api.delete(`/admin/update-requests/${request.REQUEST_ID}`);
+    notifySuccess(data.message, 'Request log deleted');
+    await refresh();
+  } catch (e) {
+    message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Request log could not be deleted');
   }
 }
 
@@ -565,11 +610,20 @@ onMounted(refresh);
           <div class="table-wrap"><table>
             <thead><tr><th>{{ t('Merit List ID') }}</th><th>{{ t('Class ID') }}</th><th>{{ t('Name') }}</th><th>{{ t('Phone') }}</th><th>{{ t('Batch') }}</th><th>{{ t('Approval Status') }}</th><th>{{ t('IPI') }}</th><th>{{ t('Actions') }}</th></tr></thead>
             <tbody>
-              <tr v-for="employee in employees" :key="employee.EMP_ENTRY_ID"><td>{{ employee.MERITLIST_ID }}</td><td>{{ employee.CLASS_ID }}</td><td>{{ employee.NAME }}</td><td>{{ employee.PHONE }}</td><td>{{ employee.batch_no }}</td><td>{{ t(employee.APPROVAL_STATUS === 'DRAFT' ? 'Draft' : employee.APPROVAL_STATUS === 'PENDING' ? 'Pending' : employee.APPROVAL_STATUS === 'APPROVED' ? 'Approved' : 'Rejected') }}<small v-if="employee.APPROVAL_STATUS === 'DRAFT'" class="status-note">{{ t('Waiting for employee submission') }}</small></td><td>{{ employee.IPI || t('Not assigned') }}</td><td class="actions-cell"><router-link class="button-link" :to="{ name: 'admin-employee-edit', params: { empEntryId: employee.EMP_ENTRY_ID } }">{{ t('Edit Details') }}</router-link><button v-if="['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)" class="primary" @click="approveEmployee(employee, 'APPROVED')">{{ t('Approve') }}</button><button v-if="employee.APPROVAL_STATUS === 'PENDING'" class="danger" @click="approveEmployee(employee, 'REJECTED')">{{ t('Reject') }}</button><button @click="assignIpi(employee)">{{ t(employee.IPI ? 'Change IPI' : 'Assign IPI') }}</button><button v-if="isSuperAdmin" class="danger" @click="deleteEmployee(employee)">{{ t('Delete') }}</button></td></tr>
+              <tr v-for="employee in employees" :key="employee.EMP_ENTRY_ID"><td>{{ employee.MERITLIST_ID }}</td><td>{{ employee.CLASS_ID }}</td><td>{{ employee.NAME }}</td><td>{{ employee.PHONE }}</td><td>{{ employee.batch_no }}</td><td>{{ t(employee.APPROVAL_STATUS === 'DRAFT' ? 'Draft' : employee.APPROVAL_STATUS === 'PENDING' ? 'Pending' : employee.APPROVAL_STATUS === 'APPROVED' ? 'Approved' : 'Rejected') }}<small v-if="employee.APPROVAL_STATUS === 'DRAFT'" class="status-note">{{ t('Waiting for employee submission') }}</small></td><td>{{ employee.IPI || t('Not assigned') }}</td><td class="actions-cell"><router-link class="button-link" :to="{ name: 'admin-employee-edit', params: { empEntryId: employee.EMP_ENTRY_ID } }">{{ t('Edit Details') }}</router-link><button v-if="['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)" class="primary" @click="approveEmployee(employee, 'APPROVED')">{{ t('Approve') }}</button><button v-if="employee.APPROVAL_STATUS === 'PENDING'" class="danger" @click="approveEmployee(employee, 'REJECTED')">{{ t('Reject') }}</button><button @click="assignIpi(employee)">{{ t(employee.IPI ? 'Change IPI' : 'Assign IPI') }}</button><button v-if="employee.APPROVAL_STATUS === 'APPROVED'" @click="openCorrectionModal(employee)">{{ t('Send for Correction') }}</button><button v-if="isSuperAdmin" class="danger" @click="deleteEmployee(employee)">{{ t('Delete') }}</button></td></tr>
               <tr v-if="!employees.length"><td colspan="8">No employees found.</td></tr>
             </tbody>
           </table></div>
       </section>
+
+      <div v-if="correctionModalOpen" class="modal-backdrop" @click.self="correctionModalOpen = false">
+        <section class="card modal" role="dialog" aria-modal="true" aria-labelledby="correction-title">
+          <div class="section-title"><h2 id="correction-title">{{ t('Send for Correction') }}</h2><button type="button" @click="correctionModalOpen = false">{{ t('Close') }}</button></div>
+          <p class="muted">Grant 24-hour update access to <b>{{ correctionEmployee?.NAME || correctionEmployee?.MERITLIST_ID }}</b>. The employee will see these instructions after verifying on the public form.</p>
+          <label>{{ t('Correction Instructions') }}</label><textarea v-model="correctionNote" maxlength="1000" rows="5" placeholder="Describe the information that needs correction"></textarea>
+          <div class="modal-actions"><button type="button" @click="correctionModalOpen = false">{{ t('Cancel') }}</button><button class="primary" @click="grantCorrectionAccess">{{ t('Grant 24h Access') }}</button></div>
+        </section>
+      </div>
 
       <form v-if="activeSection === 'employees' && selectedEmployeeId" class="form" novalidate @submit.prevent="saveEmployeeDetails">
         <section class="card">
@@ -680,11 +734,11 @@ onMounted(refresh);
 
       <section v-if="activeSection === 'requests'" class="card">
         <h2>{{ t('Update Requests') }}</h2>
-        <p class="muted">Requests are only needed when an approved employee's batch is inactive. Active batches allow updates immediately.</p>
+        <p class="muted">Approve employee requests, grant or extend correction access, and remove request logs. Deleting an active approval revokes its temporary access.</p>
         <div class="table-wrap"><table>
           <thead><tr><th>Merit List</th><th>Class ID</th><th>IPI</th><th>Name</th><th>Batch</th><th>Note</th><th>Status</th><th>Until</th><th>Actions</th></tr></thead>
           <tbody>
-            <tr v-for="request in requests" :key="request.REQUEST_ID"><td>{{ request.MERITLIST_ID }}</td><td>{{ request.CLASS_ID }}</td><td>{{ request.IPI || '-' }}</td><td>{{ request.NAME }}</td><td>{{ request.BATCH_NO }}</td><td>{{ request.REQUEST_NOTE }}</td><td>{{ request.STATUS }}</td><td>{{ formatDateTime(request.APPROVED_UNTIL) }}</td><td v-if="request.STATUS === 'PENDING'" class="actions-cell"><button class="primary" @click="decide(request.REQUEST_ID, 'APPROVED')">Approve 24h</button><button class="danger" @click="decide(request.REQUEST_ID, 'REJECTED')">Reject</button></td><td v-else>-</td></tr>
+            <tr v-for="request in requests" :key="request.REQUEST_ID"><td>{{ request.MERITLIST_ID }}</td><td>{{ request.CLASS_ID }}</td><td>{{ request.IPI || '-' }}</td><td>{{ request.NAME }}</td><td>{{ request.BATCH_NO }}</td><td>{{ request.ADMIN_REMARKS || request.REQUEST_NOTE || '-' }}</td><td>{{ request.STATUS }}</td><td>{{ formatDateTime(request.APPROVED_UNTIL) }}</td><td class="actions-cell"><button v-if="request.STATUS === 'PENDING'" class="primary" @click="decide(request.REQUEST_ID, 'APPROVED')">{{ t('Approve 24h') }}</button><button v-if="request.STATUS === 'PENDING'" class="danger" @click="decide(request.REQUEST_ID, 'REJECTED')">{{ t('Reject') }}</button><button v-if="request.STATUS !== 'PENDING'" @click="decide(request.REQUEST_ID, 'APPROVED')">{{ t(request.STATUS === 'APPROVED' ? 'Extend 24h' : 'Allow 24h') }}</button><button class="danger" @click="deleteUpdateRequest(request)">{{ t('Delete Log') }}</button></td></tr>
             <tr v-if="!requests.length"><td colspan="9">No update requests found.</td></tr>
           </tbody>
         </table></div>

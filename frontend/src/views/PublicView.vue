@@ -189,6 +189,10 @@ async function lookup() {
     } else if (data.reason === 'REJECTED') {
       message.value = 'Identity verified. This employee entry was not approved. Please contact an administrator.';
 
+    } else if (data.correctionNote) {
+      message.value = `Identity verified. Correction required: ${data.correctionNote}` +
+        (data.approvedUntil ? ` Update access is available until ${formatDateTime(data.approvedUntil)}.` : '');
+
     } else if (data.reason === 'TEMP_APPROVAL') {
       message.value =
         `Identity verified. Admin approved temporary update access until ${formatDateTime(data.approvedUntil)}.`;

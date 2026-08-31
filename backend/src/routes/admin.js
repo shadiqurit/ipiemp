@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import ExcelJS from 'exceljs';
+import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db.js';
 import { requireAdmin, requireSuperAdmin, signAdmin } from '../auth.js';
 import { normalizeAndValidateEmployeePhones } from '../utils/phones.js';
@@ -1016,6 +1017,81 @@ router.patch('/employees/:empEntryId/ipi', async (req, res, next) => {
   }
 });
 
+router.post('/employees/:empEntryId/correction-access', async (req, res, next) => {
+  const empEntryId = Number(req.params.empEntryId);
+  const note = String(req.body?.note || '').trim();
+
+  if (!Number.isInteger(empEntryId) || empEntryId <= 0) {
+    return res.status(400).json({ message: 'Invalid employee entry ID.' });
+  }
+  if (!note) {
+    return res.status(400).json({ message: 'Correction instructions are required.' });
+  }
+  if (note.length > 1000) {
+    return res.status(400).json({ message: 'Correction instructions cannot exceed 1000 characters.' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [employees] = await conn.execute(
+      `SELECT EMP_ENTRY_ID, IPI, MERITLIST_ID, CLASS_ID, batch_no, APPROVAL_STATUS
+         FROM up_emp WHERE EMP_ENTRY_ID = ? FOR UPDATE`,
+      [empEntryId]
+    );
+    const employee = employees[0];
+    if (!employee) {
+      throw Object.assign(new Error('Employee record not found.'), { status: 404 });
+    }
+    if (employee.APPROVAL_STATUS !== 'APPROVED') {
+      throw Object.assign(new Error('Correction access can only be granted to an approved employee.'), { status: 409 });
+    }
+
+    const [pending] = await conn.execute(
+      `SELECT REQUEST_ID FROM hr_update_request
+        WHERE EMP_ENTRY_ID = ? AND STATUS = 'PENDING'
+        ORDER BY REQUESTED_AT DESC LIMIT 1 FOR UPDATE`,
+      [empEntryId]
+    );
+
+    if (pending[0]) {
+      await conn.execute(
+        `UPDATE hr_update_request
+            SET STATUS = 'APPROVED', APPROVED_AT = NOW(),
+                APPROVED_UNTIL = DATE_ADD(NOW(), INTERVAL 24 HOUR),
+                APPROVED_BY = ?, ADMIN_REMARKS = ?, UPDATED_AT = NOW()
+          WHERE REQUEST_ID = ?`,
+        [req.admin.username, note, pending[0].REQUEST_ID]
+      );
+    } else {
+      await conn.execute(
+        `INSERT INTO hr_update_request
+          (REQUEST_ID, EMP_ENTRY_ID, IPI, MERITLIST_ID, CLASS_ID, BATCH_NO,
+           REQUEST_NOTE, REQUESTED_AT, STATUS, APPROVED_AT, APPROVED_UNTIL,
+           APPROVED_BY, ADMIN_REMARKS)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), 'APPROVED', NOW(),
+                 DATE_ADD(NOW(), INTERVAL 24 HOUR), ?, ?)`,
+        [
+          uuidv4(), employee.EMP_ENTRY_ID, employee.IPI || null,
+          employee.MERITLIST_ID, employee.CLASS_ID, employee.batch_no,
+          'Correction requested by administrator.', req.admin.username, note
+        ]
+      );
+    }
+
+    await conn.commit();
+    res.status(201).json({
+      ok: true,
+      message: 'Correction access granted for 24 hours. The employee will see the instructions after verification.'
+    });
+  } catch (e) {
+    await conn.rollback();
+    next(e);
+  } finally {
+    conn.release();
+  }
+});
+
 router.get('/update-requests', async (req, res, next) => {
   try {
     await pool.query(
@@ -1063,7 +1139,7 @@ router.patch('/update-requests/:requestId', async (req, res, next) => {
 
   try {
     if (status === 'APPROVED') {
-      await pool.execute(
+      const [result] = await pool.execute(
         `UPDATE hr_update_request
             SET STATUS = 'APPROVED',
                 APPROVED_AT = NOW(),
@@ -1074,9 +1150,10 @@ router.patch('/update-requests/:requestId', async (req, res, next) => {
           WHERE REQUEST_ID = ?`,
         [req.admin.username, remark || null, req.params.requestId]
       );
+      if (!result.affectedRows) return res.status(404).json({ message: 'Update request not found.' });
 
     } else {
-      await pool.execute(
+      const [result] = await pool.execute(
         `UPDATE hr_update_request
             SET STATUS = 'REJECTED',
                 APPROVED_AT = NULL,
@@ -1087,10 +1164,26 @@ router.patch('/update-requests/:requestId', async (req, res, next) => {
           WHERE REQUEST_ID = ?`,
         [req.admin.username, remark || null, req.params.requestId]
       );
+      if (!result.affectedRows) return res.status(404).json({ message: 'Update request not found.' });
     }
 
     res.json({ ok: true });
 
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.delete('/update-requests/:requestId', async (req, res, next) => {
+  try {
+    const [result] = await pool.execute(
+      `DELETE FROM hr_update_request WHERE REQUEST_ID = ?`,
+      [req.params.requestId]
+    );
+    if (!result.affectedRows) {
+      return res.status(404).json({ message: 'Update request not found.' });
+    }
+    res.json({ ok: true, message: 'Update request log deleted.' });
   } catch (e) {
     next(e);
   }

@@ -42,16 +42,28 @@ export async function getEmployeePermission(
   );
 
   if (batchRows[0]?.STATUS === 'ACTIVE') {
+    const [corrections] = await conn.execute(
+      `SELECT ADMIN_REMARKS, APPROVED_UNTIL
+         FROM hr_update_request
+        WHERE EMP_ENTRY_ID = ?
+          AND STATUS = 'APPROVED'
+          AND APPROVED_UNTIL > NOW()
+          AND ADMIN_REMARKS IS NOT NULL
+        ORDER BY APPROVED_UNTIL DESC
+        LIMIT 1`,
+      [empEntryId]
+    );
     return {
       canEdit: true,
       reason: 'ACTIVE_BATCH',
-      approvedUntil: null,
+      approvedUntil: corrections[0]?.APPROVED_UNTIL || null,
+      correctionNote: corrections[0]?.ADMIN_REMARKS || null,
       pending: false
     };
   }
 
   const [approved] = await conn.execute(
-    `SELECT REQUEST_ID, APPROVED_UNTIL
+    `SELECT REQUEST_ID, APPROVED_UNTIL, ADMIN_REMARKS
        FROM hr_update_request
       WHERE EMP_ENTRY_ID = ?
         AND STATUS = 'APPROVED'
@@ -66,6 +78,7 @@ export async function getEmployeePermission(
       canEdit: true,
       reason: 'TEMP_APPROVAL',
       approvedUntil: approved[0].APPROVED_UNTIL,
+      correctionNote: approved[0].ADMIN_REMARKS || null,
       pending: false
     };
   }
