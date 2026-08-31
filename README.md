@@ -313,8 +313,9 @@ matching backend.
 ## Existing database: Admin and Super Admin user types
 
 Super Admin accounts can create, edit, activate/deactivate, reset passwords,
-and delete administrator accounts. They can also permanently delete empty
-batches and employee records. Admin accounts retain employee, batch, approval,
+and delete administrator accounts. They can also rename batches, change their
+status, permanently delete empty batches, and delete employee records. Admin
+accounts retain employee, batch, approval,
 request, and export access but cannot manage users or perform permanent deletes.
 
 For an existing database, run

@@ -25,6 +25,8 @@ const batches = ref([]);
 const requests = ref([]);
 const employees = ref([]);
 const newBatch = ref('');
+const batchModalOpen = ref(false);
+const batchEditor = reactive({ originalBatchNo: '', batchNo: '', status: 'INACTIVE' });
 const employeeBatchFilter = ref('');
 const employeeSearch = ref('');
 const batchFilterOptions = computed(() => batches.value.map(batch => ({ value: batch.BATCH_NO, label: `${batch.BATCH_NO} (${batch.STATUS})` })));
@@ -206,6 +208,31 @@ async function setBatch(batchNo, status) {
   try {
     await api.patch(`/admin/batches/${encodeURIComponent(batchNo)}/status`, { status });
     notifySuccess(`Batch ${batchNo} is now ${status.toLowerCase()}.`, 'Batch updated');
+    await refresh();
+  } catch (e) {
+    message.value = e.response?.data?.message || e.message;
+    notifyError(message.value, 'Batch could not be updated');
+  }
+}
+
+function openBatchModal(batch) {
+  batchEditor.originalBatchNo = batch.BATCH_NO;
+  batchEditor.batchNo = batch.BATCH_NO;
+  batchEditor.status = batch.STATUS;
+  batchModalOpen.value = true;
+}
+
+async function updateBatch() {
+  try {
+    const { data } = await api.put(
+      `/admin/batches/${encodeURIComponent(batchEditor.originalBatchNo)}`,
+      { batchNo: batchEditor.batchNo, status: batchEditor.status }
+    );
+    if (employeeBatchFilter.value === batchEditor.originalBatchNo) {
+      employeeBatchFilter.value = batchEditor.batchNo;
+    }
+    notifySuccess(data.message, 'Batch updated');
+    batchModalOpen.value = false;
     await refresh();
   } catch (e) {
     message.value = e.response?.data?.message || e.message;
@@ -450,11 +477,21 @@ onMounted(refresh);
         <div class="table-wrap"><table>
           <thead><tr><th>{{ t('Batch') }}</th><th>{{ t('Status') }}</th><th>{{ t('Actions') }}</th></tr></thead>
           <tbody>
-            <tr v-for="batch in batches" :key="batch.BATCH_NO"><td>{{ batch.BATCH_NO }}</td><td>{{ t(batch.STATUS) }}</td><td class="actions-cell"><button v-if="batch.STATUS !== 'ACTIVE'" @click="setBatch(batch.BATCH_NO, 'ACTIVE')">{{ t('Activate') }}</button><button v-else @click="setBatch(batch.BATCH_NO, 'INACTIVE')">{{ t('Deactivate') }}</button><button @click="exportBatch(batch.BATCH_NO)">{{ t('Excel') }}</button><button v-if="isSuperAdmin" class="danger" @click="deleteBatch(batch.BATCH_NO)">{{ t('Delete') }}</button></td></tr>
+            <tr v-for="batch in batches" :key="batch.BATCH_NO"><td>{{ batch.BATCH_NO }}</td><td>{{ t(batch.STATUS) }}</td><td class="actions-cell"><button v-if="batch.STATUS !== 'ACTIVE'" @click="setBatch(batch.BATCH_NO, 'ACTIVE')">{{ t('Activate') }}</button><button v-else @click="setBatch(batch.BATCH_NO, 'INACTIVE')">{{ t('Deactivate') }}</button><button @click="exportBatch(batch.BATCH_NO)">{{ t('Excel') }}</button><button v-if="isSuperAdmin" @click="openBatchModal(batch)">{{ t('Edit') }}</button><button v-if="isSuperAdmin" class="danger" @click="deleteBatch(batch.BATCH_NO)">{{ t('Delete') }}</button></td></tr>
             <tr v-if="!batches.length"><td colspan="3">No batches found.</td></tr>
           </tbody>
         </table></div>
       </section>
+
+      <div v-if="isSuperAdmin && batchModalOpen" class="modal-backdrop" @click.self="batchModalOpen = false">
+        <section class="card modal" role="dialog" aria-modal="true" aria-labelledby="edit-batch-title">
+          <div class="section-title"><h2 id="edit-batch-title">{{ t('Edit Batch') }}</h2><button type="button" @click="batchModalOpen = false">{{ t('Close') }}</button></div>
+          <p class="muted">Changing the batch number also updates every linked employee and update request.</p>
+          <label>{{ t('Batch') }}</label><input v-model="batchEditor.batchNo" maxlength="100" />
+          <label>{{ t('Status') }}</label><select v-model="batchEditor.status"><option value="ACTIVE">{{ t('Active') }}</option><option value="INACTIVE">{{ t('Inactive') }}</option></select>
+          <div class="modal-actions"><button type="button" @click="batchModalOpen = false">{{ t('Cancel') }}</button><button class="primary" @click="updateBatch">{{ t('Save Changes') }}</button></div>
+        </section>
+      </div>
 
       <section v-if="activeSection === 'employees'" class="card">
           <div class="section-title"><div><h2>{{ t('Employee List') }}</h2><p class="muted">New submissions must be approved before an employee can update their data.</p></div><div class="employee-filters"><input v-model="employeeSearch" placeholder="Search name, ID, IPI or phone" @keyup.enter="refresh" /><AutoCompleteSelect v-model="employeeBatchFilter" :options="batchFilterOptions" :placeholder="t('Search batch')" /><button @click="refresh">{{ t('Search') }}</button></div></div>

@@ -421,6 +421,104 @@ router.patch('/batches/:batchNo/status', async (req, res, next) => {
   }
 });
 
+router.put('/batches/:batchNo', requireSuperAdmin, async (req, res, next) => {
+  const currentBatchNo = String(req.params.batchNo || '').trim();
+  const batchNo = String(req.body?.batchNo || '').trim();
+  const status = String(req.body?.status || '').toUpperCase();
+
+  if (!currentBatchNo || !batchNo) {
+    return res.status(400).json({ message: 'Batch number is required.' });
+  }
+  if (batchNo.length > 100) {
+    return res.status(400).json({ message: 'Batch number cannot exceed 100 characters.' });
+  }
+  if (!['ACTIVE', 'INACTIVE'].includes(status)) {
+    return res.status(400).json({ message: 'Status must be ACTIVE or INACTIVE.' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [batches] = await conn.query(
+      `SELECT * FROM hr_batch_control FOR UPDATE`
+    );
+    const existing = batches.find(row => row.BATCH_NO === currentBatchNo);
+    if (!existing) {
+      await conn.rollback();
+      return res.status(404).json({ message: 'Batch not found.' });
+    }
+
+    if (batchNo !== currentBatchNo) {
+      if (batches.some(row => row.BATCH_NO === batchNo)) {
+        await conn.rollback();
+        return res.status(409).json({ message: 'This batch number already exists.' });
+      }
+
+      await conn.execute(
+        `INSERT INTO hr_batch_control
+          (BATCH_NO, STATUS, STARTED_AT, CLOSED_AT, CREATED_BY, CREATED_AT, UPDATED_AT)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          batchNo,
+          existing.STATUS,
+          existing.STARTED_AT,
+          existing.CLOSED_AT,
+          existing.CREATED_BY,
+          existing.CREATED_AT,
+          existing.UPDATED_AT
+        ]
+      );
+      await conn.execute(
+        `UPDATE up_emp SET batch_no = ? WHERE batch_no = ?`,
+        [batchNo, currentBatchNo]
+      );
+      await conn.execute(
+        `UPDATE hr_update_request SET BATCH_NO = ? WHERE BATCH_NO = ?`,
+        [batchNo, currentBatchNo]
+      );
+      await conn.execute(
+        `DELETE FROM hr_batch_control WHERE BATCH_NO = ?`,
+        [currentBatchNo]
+      );
+    }
+
+    if (status === 'ACTIVE') {
+      await conn.execute(
+        `UPDATE hr_batch_control
+            SET STATUS = 'INACTIVE', CLOSED_AT = NOW(), UPDATED_AT = NOW()
+          WHERE STATUS = 'ACTIVE' AND BATCH_NO <> ?`,
+        [batchNo]
+      );
+      await conn.execute(
+        `UPDATE hr_batch_control
+            SET STATUS = 'ACTIVE', STARTED_AT = COALESCE(STARTED_AT, NOW()),
+                CLOSED_AT = NULL, UPDATED_AT = NOW()
+          WHERE BATCH_NO = ?`,
+        [batchNo]
+      );
+    } else {
+      await conn.execute(
+        `UPDATE hr_batch_control
+            SET STATUS = 'INACTIVE', CLOSED_AT = NOW(), UPDATED_AT = NOW()
+          WHERE BATCH_NO = ?`,
+        [batchNo]
+      );
+    }
+
+    await conn.commit();
+    res.json({ ok: true, message: 'Batch updated.' });
+  } catch (e) {
+    await conn.rollback();
+    if (e.code === 'ER_DUP_ENTRY') {
+      e.status = 409;
+      e.message = 'This batch number already exists.';
+    }
+    next(e);
+  } finally {
+    conn.release();
+  }
+});
+
 router.delete('/batches/:batchNo', requireSuperAdmin, async (req, res, next) => {
   const batchNo = String(req.params.batchNo || '').trim();
   if (!batchNo) return res.status(400).json({ message: 'Batch number is required.' });
