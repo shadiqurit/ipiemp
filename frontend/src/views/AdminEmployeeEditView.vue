@@ -165,10 +165,10 @@ onMounted(load);
         <div class="grid">
           <div class="field"><label>{{ t('Employee Name') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><input v-model="employee.NAME" :required="requiresCompleteEmployee" /><small class="field-hint">{{ t('As per SSC/Dakhil certificate') }}</small></div>
           <div class="field"><label>{{ t('Birth Date') }}</label><DateInput v-model="employee.BIRTHDATE" /><small class="field-hint">{{ t('As per SSC/Dakhil certificate') }}</small></div>
-          <div class="field"><label>{{ t('Blood Group') }}</label><select v-model="employee.BLD_GROUP"><option value="">Select</option><option v-for="group in bloodGroups" :key="group" :value="group">{{ group }}</option></select></div>
+          <div class="field"><label>{{ t('Blood Group') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><select v-model="employee.BLD_GROUP"><option value="">Select</option><option v-for="group in bloodGroups" :key="group" :value="group">{{ group }}</option></select></div>
           <div class="field"><label>{{ t('Nationality') }}</label><input v-model="employee.NATIONALITY" /></div>
-          <div class="field"><label>{{ t('Height') }}</label><HeightInput v-model="employee.HEIGHT" /></div>
-          <div class="field"><label>{{ t('Weight (kg)') }}</label><WeightInput v-model="employee.WEIGHT" /></div>
+          <div class="field"><label>{{ t('Height') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><HeightInput v-model="employee.HEIGHT" /></div>
+          <div class="field"><label>{{ t('Weight (kg)') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><WeightInput v-model="employee.WEIGHT" /></div>
           <div class="field"><label>{{ t('Gender') }}</label><select v-model="employee.GENDER"><option value="">Select</option><option value="M">{{ t('Male') }}</option><option value="F">{{ t('Female') }}</option></select></div>
           <div class="field"><label>{{ t('Religion') }}</label><select v-model="employee.RELIGION"><option value="">Select</option><option value="I">{{ t('Islam') }}</option><option value="H">{{ t('Hindu') }}</option><option value="B">{{ t('Buddha') }}</option><option value="C">{{ t('Christian') }}</option></select></div>
           <div class="field"><label>{{ t('Marital Status') }}</label><select v-model="employee.MARITAL_STATUS" @change="onMaritalStatusChange"><option value="">Select</option><option value="U">{{ t('Unmarried') }}</option><option value="M">{{ t('Married') }}</option></select></div>
@@ -205,7 +205,7 @@ onMounted(load);
 
       <section id="emergency" class="card">
         <h2 data-step="05">{{ t('Emergency Contact') }}</h2>
-        <div class="grid"><div class="field"><label>{{ t('Emergency Person') }}</label><input v-model="employee.EMGRCNY_PERSON" /></div><div class="field"><label>{{ t('Relationship') }}</label><input v-model="employee.EMGRCNY_RELATION" /></div><div class="field"><label>{{ t('Emergency Phone') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><PhoneInput v-model="employee.EMGRCNY_PHONE" :required="requiresCompleteEmployee" /></div><div class="field"><label>{{ t('Emergency Address') }}</label><input v-model="employee.EMGRCNY_ADDRESS" /></div></div>
+        <div class="grid"><div class="field"><label>{{ t('Emergency Person') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><input v-model="employee.EMGRCNY_PERSON" /></div><div class="field"><label>{{ t('Relationship') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><input v-model="employee.EMGRCNY_RELATION" /></div><div class="field"><label>{{ t('Emergency Phone') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><PhoneInput v-model="employee.EMGRCNY_PHONE" :required="requiresCompleteEmployee" /></div><div class="field"><label>{{ t('Emergency Address') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><input v-model="employee.EMGRCNY_ADDRESS" /></div></div>
       </section>
 
       <section id="family" class="card">

@@ -33,7 +33,8 @@ const FORM_STEPS = [
 
 const REQUIRED_BY_STEP = [
   [
-    ['NAME', 'Employee Name'], ['BIRTHDATE', 'Birth Date'], ['NATIONALITY', 'Nationality'],
+    ['NAME', 'Employee Name'], ['BIRTHDATE', 'Birth Date'], ['BLD_GROUP', 'Blood Group'],
+    ['NATIONALITY', 'Nationality'], ['HEIGHT', 'Height'], ['WEIGHT', 'Weight (kg)'],
     ['GENDER', 'Gender'], ['RELIGION', 'Religion'], ['MARITAL_STATUS', 'Marital Status']
   ],
   [['PHONE', 'Primary Phone'], ['NID', 'NID']],
@@ -47,7 +48,10 @@ const REQUIRED_BY_STEP = [
     ['PRESENT_THANA', 'Present Address — Thana / Upazila'],
     ['PRESENT_DISTRICT', 'Present Address — District']
   ],
-  [['EMGRCNY_PHONE', 'Emergency Phone']],
+  [
+    ['EMGRCNY_PERSON', 'Emergency Person'], ['EMGRCNY_RELATION', 'Emergency Relationship'],
+    ['EMGRCNY_PHONE', 'Emergency Phone'], ['EMGRCNY_ADDRESS', 'Emergency Address']
+  ],
   [['FATHER_NAME', 'Father Name'], ['MOTHER_NAME', 'Mother Name']],
   [
     ['GRNT_NAME', 'Guarantor Name'], ['GRNT_RELE', 'Guarantor Relationship'],
@@ -102,7 +106,7 @@ const employee = reactive({
   FATHER_NAME:'',FATHER_PHONE:'',MOTHER_NAME:'',MOTHER_PHONE:'',
   SPOUSE_NAME:'',SPOSE_MARRIAGE_DATE:'',SPOSE_OCCUPATION:'',SPOUSE_PHONE:'',
   GRNT_NAME:'',GRNT_RELE:'',GRNT_FATHER:'',GRNT_PRESENT_ADD:'',
-  GRNT_PERMANET_ADD:'',GRNT_NATIONALITY:'',GRNT_PROFFESSION:'',GRNT_NID:'',GRNT_MOBILE:''
+  GRNT_PERMANET_ADD:'',GRNT_NATIONALITY:'Bangladeshi',GRNT_PROFFESSION:'',GRNT_NID:'',GRNT_MOBILE:''
 });
 
 const education = ref([]);
@@ -143,6 +147,7 @@ const guarantorFields = [
 function resetEmployee() {
   Object.keys(employee).forEach(k => employee[k] = '');
   employee.NATIONALITY = 'Bangladeshi';
+  employee.GRNT_NATIONALITY = 'Bangladeshi';
   education.value = normalizeEducationRows();
   children.value = [];
   batchNo.value = '';
@@ -307,6 +312,7 @@ async function startNew() {
         employee[key] = data.employee?.[key] ?? '';
       });
       employee.NATIONALITY ||= 'Bangladeshi';
+      employee.GRNT_NATIONALITY ||= 'Bangladeshi';
       education.value = normalizeEducationRows(data.education);
       children.value = normalizeChildren(data.children);
     }
@@ -733,7 +739,7 @@ onMounted(async () => {
             :class="{ 'has-error': errorFields.has(key) }"
             :data-field="key"
           >
-            <label>{{ t(label) }}<span v-if="['NAME', 'BIRTHDATE', 'NATIONALITY'].includes(key)" class="required-mark"> *</span></label>
+            <label>{{ t(label) }}<span v-if="['NAME', 'BIRTHDATE', 'BLD_GROUP', 'NATIONALITY', 'HEIGHT', 'WEIGHT'].includes(key)" class="required-mark"> *</span></label>
             <select v-if="key === 'BLD_GROUP'" v-model="employee[key]" :disabled="!editable"><option value="">{{ t('Select') }}</option><option v-for="group in BLOOD_GROUPS" :key="group" :value="group">{{ group }}</option></select>
             <DateInput v-else-if="type === 'date'" v-model="employee[key]" :disabled="!editable" />
             <HeightInput v-else-if="key === 'HEIGHT'" v-model="employee.HEIGHT" :disabled="!editable" />
@@ -909,7 +915,7 @@ onMounted(async () => {
             :class="{ 'has-error': errorFields.has(key) }"
             :data-field="key"
           >
-            <label>{{ t(label) }}<span v-if="key.includes('PHONE')" class="required-mark"> *</span></label>
+            <label>{{ t(label) }}<span class="required-mark"> *</span></label>
             <PhoneInput v-if="key.includes('PHONE')" v-model="employee[key]" :disabled="!editable" />
             <input v-else v-model="employee[key]" :disabled="!editable" />
           </div>
