@@ -1096,7 +1096,7 @@ router.patch('/employees/:empEntryId/ipi', async (req, res, next) => {
     await conn.beginTransaction();
 
     const [employees] = await conn.execute(
-      `SELECT EMP_ENTRY_ID, MERITLIST_ID, CLASS_ID, IPI
+      `SELECT EMP_ENTRY_ID, MERITLIST_ID, CLASS_ID, IPI, APPROVAL_STATUS
          FROM up_emp
         WHERE EMP_ENTRY_ID = ?
         FOR UPDATE`,
@@ -1107,6 +1107,13 @@ router.patch('/employees/:empEntryId/ipi', async (req, res, next) => {
       throw Object.assign(
         new Error('Employee record not found.'),
         { status: 404 }
+      );
+    }
+
+    if (employees[0].APPROVAL_STATUS !== 'APPROVED') {
+      throw Object.assign(
+        new Error('IPI can only be assigned after the employee is approved.'),
+        { status: 409 }
       );
     }
 
