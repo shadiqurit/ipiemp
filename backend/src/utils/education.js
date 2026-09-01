@@ -71,7 +71,6 @@ export function validateAndNormalizeEducation(input, { required = true } = {}) {
     const active = rowRequired || hasEnteredDetails(row);
 
     if (!active) {
-      if (!required) normalized.push(row);
       continue;
     }
 
@@ -126,7 +125,7 @@ export function validateAndNormalizeEducation(input, { required = true } = {}) {
       row.EXAMGROUP = null;
     }
 
-    normalized.push(row);
+    normalized.push({ ...row, SLNO: index + 1 });
   }
 
   return normalized;

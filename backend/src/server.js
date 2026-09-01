@@ -32,10 +32,36 @@ const origins = String(process.env.FRONTEND_ORIGIN || '')
   .map(normalizeOrigin)
   .filter(Boolean);
 
+function isPrivateDevelopmentOrigin(origin) {
+  if (process.env.NODE_ENV === 'production') return false;
+
+  try {
+    const { protocol, hostname } = new URL(origin);
+    if (!['http:', 'https:'].includes(protocol)) return false;
+
+    return hostname === 'localhost'
+      || hostname === '127.0.0.1'
+      || hostname === '::1'
+      || /^10\./.test(hostname)
+      || /^192\.168\./.test(hostname)
+      || /^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+  } catch {
+    return false;
+  }
+}
+
 app.use(cors({
   origin(origin, cb) {
-    if (!origin || !origins.length || origins.includes(normalizeOrigin(origin))) return cb(null, true);
-    cb(new Error('Origin not allowed by CORS.'));
+    if (
+      !origin
+      || !origins.length
+      || origins.includes(normalizeOrigin(origin))
+      || isPrivateDevelopmentOrigin(origin)
+    ) {
+      return cb(null, true);
+    }
+
+    cb(Object.assign(new Error('Origin not allowed by CORS.'), { status: 403 }));
   }
 }));
 

@@ -9,6 +9,7 @@ import { validateAndNormalizeEducation } from '../utils/education.js';
 import { normalizeAndValidateMeasurements } from '../utils/measurements.js';
 import { normalizeAndValidateEmployeeNids } from '../utils/nid.js';
 import { validateAndNormalizeChildren } from '../utils/children.js';
+import { validateRequiredEmployeeFields } from '../utils/employee-required.js';
 
 const router = Router();
 
@@ -34,9 +35,7 @@ function cleanObj(input, columns) {
 }
 
 function validateEmployee(employee, { required = false } = {}) {
-  if (required && !employee.NAME) {
-    throw Object.assign(new Error('Employee name is required.'), { status: 400 });
-  }
+  if (required) validateRequiredEmployeeFields(employee);
 
   const allowed = {
     GENDER: ['', 'M', 'F'],
@@ -629,6 +628,121 @@ router.get('/employees', async (req, res, next) => {
   }
 });
 
+/**
+ * Approve several employee submissions in one request. Selected approval may
+ * include rejected records; approve-all intentionally targets PENDING only.
+ * Invalid/incomplete submissions are reported and left unchanged so one bad
+ * record does not prevent the remaining valid submissions from being approved.
+ */
+router.patch('/employees/approval/bulk', async (req, res, next) => {
+  const approveAllSubmitted = req.body?.approveAllSubmitted === true;
+  const requestedIds = Array.isArray(req.body?.employeeIds)
+    ? [...new Set(req.body.employeeIds.map(Number))]
+    : [];
+
+  if (!approveAllSubmitted) {
+    if (!requestedIds.length) {
+      return res.status(400).json({ message: 'Select at least one employee to approve.' });
+    }
+
+    if (requestedIds.length > 500) {
+      return res.status(400).json({ message: 'A maximum of 500 employees can be approved at one time.' });
+    }
+
+    if (requestedIds.some(id => !Number.isInteger(id) || id <= 0)) {
+      return res.status(400).json({ message: 'One or more employee entry IDs are invalid.' });
+    }
+  }
+
+  const conn = await pool.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    let employees;
+    if (approveAllSubmitted) {
+      [employees] = await conn.execute(
+        `SELECT *
+           FROM up_emp
+          WHERE APPROVAL_STATUS = 'PENDING'
+          ORDER BY EMP_ENTRY_ID
+          FOR UPDATE`
+      );
+    } else {
+      const placeholders = requestedIds.map(() => '?').join(', ');
+      [employees] = await conn.execute(
+        `SELECT *
+           FROM up_emp
+          WHERE EMP_ENTRY_ID IN (${placeholders})
+            AND APPROVAL_STATUS IN ('PENDING', 'REJECTED')
+          ORDER BY EMP_ENTRY_ID
+          FOR UPDATE`,
+        requestedIds
+      );
+    }
+
+    const approvedIds = [];
+    const failures = [];
+
+    for (const employee of employees) {
+      try {
+        const [education] = await conn.execute(
+          `SELECT EXAMNAME, EXAMGROUP, BOARD, CLAS, PASSYEAR,
+                  REMARKS, INSTITUTE, SUBJECT_NAME
+             FROM hr_empexamdet
+            WHERE EMP_ENTRY_ID = ?
+            ORDER BY SLNO`,
+          [employee.EMP_ENTRY_ID]
+        );
+
+        validateEmployee(employee, { required: true });
+        validateAndNormalizeEducation(education, { required: true });
+        approvedIds.push(employee.EMP_ENTRY_ID);
+      } catch (error) {
+        failures.push({
+          employeeId: employee.EMP_ENTRY_ID,
+          name: employee.NAME || '',
+          message: error.message || 'Employee information is incomplete.'
+        });
+      }
+    }
+
+    if (approvedIds.length) {
+      const placeholders = approvedIds.map(() => '?').join(', ');
+      await conn.execute(
+        `UPDATE up_emp
+            SET APPROVAL_STATUS = 'APPROVED',
+                APPROVED_BY = ?,
+                APPROVED_AT = NOW(),
+                UPDATED_AT = NOW()
+          WHERE EMP_ENTRY_ID IN (${placeholders})`,
+        [req.admin.username, ...approvedIds]
+      );
+    }
+
+    const skippedCount = approveAllSubmitted
+      ? 0
+      : requestedIds.length - employees.length;
+
+    await conn.commit();
+    res.json({
+      ok: true,
+      approvedCount: approvedIds.length,
+      failedCount: failures.length,
+      skippedCount,
+      failures,
+      message: approvedIds.length
+        ? `${approvedIds.length} employee${approvedIds.length === 1 ? '' : 's'} approved.`
+        : 'No employees were approved.'
+    });
+  } catch (e) {
+    await conn.rollback();
+    next(e);
+  } finally {
+    conn.release();
+  }
+});
+
 router.get('/employees/:empEntryId', async (req, res, next) => {
   const empEntryId = Number(req.params.empEntryId);
 
@@ -839,7 +953,7 @@ router.put('/employees/:empEntryId', async (req, res, next) => {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           empEntryId,
-          index + 1,
+          row.SLNO || index + 1,
           ipi || null,
           row.EXAMNAME || null,
           row.EXAMGROUP || null,

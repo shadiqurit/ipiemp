@@ -186,7 +186,7 @@ onMounted(load);
         <div class="grid">
           <div class="field"><label>{{ t('Email') }}</label><input v-model="employee.EMAIL" type="email" /></div>
           <div class="field"><label>{{ t('Primary Phone') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><PhoneInput v-model="employee.PHONE" :required="requiresCompleteEmployee" autocomplete="tel" /></div>
-          <div class="field"><label>{{ t('Alternate Phone') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><PhoneInput v-model="employee.PHONE1" :required="requiresCompleteEmployee" /></div>
+          <div class="field"><label>{{ t('Alternate Phone') }} <small class="optional-mark">{{ t('Optional') }}</small></label><PhoneInput v-model="employee.PHONE1" :required="false" /></div>
           <div class="field"><label>{{ t('NID') }}</label><NidInput v-model="employee.NID" /></div>
         </div>
       </section>
@@ -210,7 +210,7 @@ onMounted(load);
 
       <section id="family" class="card">
         <h2 data-step="06">{{ t('Family Information') }}</h2>
-        <div class="grid"><div class="field"><label>{{ t('Father Name') }}</label><input v-model="employee.FATHER_NAME" /><small class="field-hint">{{ t('As per SSC/Dakhil certificate') }}</small></div><div class="field"><label>{{ t('Father Phone') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><PhoneInput v-model="employee.FATHER_PHONE" :required="requiresCompleteEmployee" /></div><div class="field"><label>{{ t('Mother Name') }}</label><input v-model="employee.MOTHER_NAME" /></div><div class="field"><label>{{ t('Mother Phone') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><PhoneInput v-model="employee.MOTHER_PHONE" :required="requiresCompleteEmployee" /></div></div>
+        <div class="grid"><div class="field"><label>{{ t('Father Name') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><input v-model="employee.FATHER_NAME" /><small class="field-hint">{{ t('As per SSC/Dakhil certificate') }}</small></div><div class="field"><label>{{ t('Father Phone') }} <small class="optional-mark">{{ t('Optional') }}</small></label><PhoneInput v-model="employee.FATHER_PHONE" :required="false" /></div><div class="field"><label>{{ t('Mother Name') }}<span v-if="requiresCompleteEmployee" class="required-mark"> *</span></label><input v-model="employee.MOTHER_NAME" /></div><div class="field"><label>{{ t('Mother Phone') }} <small class="optional-mark">{{ t('Optional') }}</small></label><PhoneInput v-model="employee.MOTHER_PHONE" :required="false" /></div></div>
         <ChildInformation v-if="employee.MARITAL_STATUS === 'M'" v-model="children" />
       </section>
 
