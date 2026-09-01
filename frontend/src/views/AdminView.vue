@@ -31,6 +31,11 @@ const bulkApprovalBusy = ref(false);
 const correctionModalOpen = ref(false);
 const correctionEmployee = ref(null);
 const correctionNote = ref('');
+const ipiModalOpen = ref(false);
+const ipiEmployee = ref(null);
+const ipiValue = ref('');
+const ipiSaving = ref(false);
+const ipiError = ref('');
 const newBatch = ref('');
 const batchModalOpen = ref(false);
 const batchEditor = reactive({ originalBatchNo: '', batchNo: '', status: 'INACTIVE' });
@@ -344,18 +349,49 @@ async function approveEmployee(employee, approvalStatus) {
   }
 }
 
-async function assignIpi(employee) {
+function assignIpi(employee) {
   clearActionFeedback();
-  const ipi = window.prompt(`Assign IPI\nMerit List ID: ${employee.MERITLIST_ID}\nClass ID: ${employee.CLASS_ID}`, employee.IPI || '');
-  if (ipi === null) return;
+  ipiEmployee.value = employee;
+  ipiValue.value = employee.IPI || '';
+  ipiError.value = '';
+  ipiModalOpen.value = true;
+}
+
+function closeIpiModal() {
+  if (ipiSaving.value) return;
+  ipiModalOpen.value = false;
+  ipiEmployee.value = null;
+  ipiValue.value = '';
+  ipiError.value = '';
+}
+
+async function saveIpi() {
+  const employee = ipiEmployee.value;
+  const ipi = ipiValue.value.trim();
+
+  if (!employee) return;
+  if (!ipi) {
+    ipiError.value = 'IPI is required.';
+    return;
+  }
+
+  ipiSaving.value = true;
+  ipiError.value = '';
+
   try {
-    const { data } = await api.patch(`/admin/employees/${employee.EMP_ENTRY_ID}/ipi`, { ipi: ipi.trim() });
+    const { data } = await api.patch(`/admin/employees/${employee.EMP_ENTRY_ID}/ipi`, { ipi });
     message.value = data.message;
     notifySuccess(message.value, 'IPI assigned');
+    ipiModalOpen.value = false;
+    ipiEmployee.value = null;
+    ipiValue.value = '';
     await refresh();
   } catch (e) {
-    message.value = e.response?.data?.message || e.message;
-    notifyError(message.value, 'IPI could not be assigned');
+    ipiError.value = e.response?.data?.message || e.message;
+    message.value = ipiError.value;
+    notifyError(ipiError.value, 'IPI could not be assigned');
+  } finally {
+    ipiSaving.value = false;
   }
 }
 
@@ -685,6 +721,51 @@ onMounted(refresh);
             </tbody>
           </table></div>
       </section>
+
+      <div v-if="ipiModalOpen" class="modal-backdrop" @click.self="closeIpiModal">
+        <form class="card modal ipi-modal" role="dialog" aria-modal="true" aria-labelledby="ipi-modal-title" @submit.prevent="saveIpi">
+          <div class="ipi-modal-header">
+            <div class="ipi-modal-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5h16M7.5 4v7M16.5 4v7M5 12.5h14a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-5.5a1 1 0 0 1 1-1Z"/><path d="M8 16.25h3"/></svg>
+            </div>
+            <div>
+              <span>{{ t('Employee identification') }}</span>
+              <h2 id="ipi-modal-title">{{ t(ipiEmployee?.IPI ? 'Change IPI' : 'Assign IPI') }}</h2>
+            </div>
+            <button class="ipi-modal-close" type="button" :disabled="ipiSaving" :aria-label="t('Close')" @click="closeIpiModal">×</button>
+          </div>
+
+          <div class="ipi-modal-body">
+            <div class="ipi-employee-summary">
+              <div><span>{{ t('Employee') }}</span><strong>{{ ipiEmployee?.NAME || '—' }}</strong></div>
+              <div><span>{{ t('Merit List ID') }}</span><strong>{{ ipiEmployee?.MERITLIST_ID }}</strong></div>
+              <div><span>{{ t('Class ID') }}</span><strong>{{ ipiEmployee?.CLASS_ID }}</strong></div>
+            </div>
+
+            <label for="ipi-value">{{ t('IPI') }}<span class="required-mark"> *</span></label>
+            <input
+              id="ipi-value"
+              v-model="ipiValue"
+              maxlength="50"
+              autocomplete="off"
+              autofocus
+              :class="{ 'field-error': ipiError }"
+              :placeholder="t('Enter IPI number')"
+              :disabled="ipiSaving"
+              @input="ipiError = ''"
+            />
+            <p v-if="ipiError" class="ipi-modal-error" role="alert">{{ ipiError }}</p>
+            <p v-else class="muted ipi-modal-hint">{{ t('IPI must be unique for each approved employee.') }}</p>
+
+            <div class="modal-actions ipi-modal-actions">
+              <button type="button" :disabled="ipiSaving" @click="closeIpiModal">{{ t('Cancel') }}</button>
+              <button class="primary" type="submit" :disabled="ipiSaving" :aria-busy="ipiSaving">
+                {{ t(ipiSaving ? 'Saving…' : 'Save IPI') }}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
 
       <div v-if="correctionModalOpen" class="modal-backdrop" @click.self="correctionModalOpen = false">
         <section class="card modal" role="dialog" aria-modal="true" aria-labelledby="correction-title">

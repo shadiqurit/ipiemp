@@ -371,6 +371,66 @@ tbody tr:hover td { background: #f8fbff; }
 }
 .modal { width: min(500px, 100%); max-height: calc(100vh - 36px); margin: 0; overflow: auto; box-shadow: 0 30px 80px rgb(9 26 47 / 34%); }
 .modal-actions { justify-content: flex-end; margin-top: 20px; }
+.ipi-modal {
+  width: min(500px, 100%);
+  padding: 0;
+  overflow: hidden;
+  border-color: rgb(184 205 229 / 88%);
+  background: #fff;
+}
+.ipi-modal-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 24px;
+  color: #fff;
+  background: linear-gradient(125deg, var(--navy), var(--blue-700) 72%, var(--teal-600));
+}
+.ipi-modal-header h2 { margin: 2px 0 0; color: #fff; font-size: 1.3rem; }
+.ipi-modal-header span { color: #cfe1f7; font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.ipi-modal-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 13%);
+}
+.ipi-modal-icon svg { width: 25px; height: 25px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ipi-modal-close {
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
+  color: #fff;
+  border-color: rgb(255 255 255 / 20%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 10%);
+  box-shadow: none;
+  font-size: 1.35rem;
+}
+.ipi-modal-close:hover:not(:disabled) { border-color: rgb(255 255 255 / 38%); background: rgb(255 255 255 / 18%); }
+.ipi-modal-body { padding: 24px; }
+.ipi-employee-summary {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1fr;
+  gap: 1px;
+  padding: 1px;
+  margin-bottom: 22px;
+  overflow: hidden;
+  border: 1px solid #dbe5f0;
+  border-radius: 12px;
+  background: #dbe5f0;
+}
+.ipi-employee-summary div { min-width: 0; padding: 12px; background: #f6f9fc; }
+.ipi-employee-summary span, .ipi-employee-summary strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ipi-employee-summary span { color: var(--muted); font-size: .65rem; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; }
+.ipi-employee-summary strong { margin-top: 4px; color: var(--navy); font-size: .82rem; }
+.ipi-modal-error { margin: 7px 0 0; color: var(--red-600); font-size: .78rem; font-weight: 720; }
+.ipi-modal-hint { margin-top: 7px; }
+.ipi-modal-actions { padding-top: 4px; border-top: 1px solid #edf1f5; }
+.ipi-modal-actions button { min-width: 112px; }
 .language-toggle {
   position: fixed;
   z-index: 100;
@@ -756,6 +816,12 @@ footer a { color: var(--muted); font-size: .84rem; font-weight: 700; text-decora
   .validation-summary { padding: 16px; }
   .validation-summary ul { display: grid; }
   .validation-summary button { width: 100%; justify-content: flex-start; text-align: left; }
+  .ipi-modal-header { padding: 19px 17px; }
+  .ipi-modal-body { padding: 19px 17px; }
+  .ipi-employee-summary { grid-template-columns: 1fr 1fr; }
+  .ipi-employee-summary div:first-child { grid-column: 1 / -1; }
+  .ipi-modal-actions { flex-direction: row; }
+  .ipi-modal-actions button { width: auto; flex: 1 1 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

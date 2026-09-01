@@ -1090,6 +1090,10 @@ router.patch('/employees/:empEntryId/ipi', async (req, res, next) => {
     });
   }
 
+  if (ipi.length > 50) {
+    return res.status(400).json({ message: 'IPI cannot exceed 50 characters.' });
+  }
+
   const conn = await pool.getConnection();
 
   try {
