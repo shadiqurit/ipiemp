@@ -1366,6 +1366,8 @@ router.get('/export/:batchNo', async (req, res, next) => {
     const [employees] = await pool.execute(
       `SELECT
           IPI,
+          MERITLIST_ID,
+          CLASS_ID,
           NAME,
           batch_no,
           BIRTHDATE,
