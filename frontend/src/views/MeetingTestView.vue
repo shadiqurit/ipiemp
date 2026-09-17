@@ -10,6 +10,7 @@ const invitations = ref([]);
 const loading = ref(false);
 const sending = ref(false);
 const syncing = ref(false);
+const checkingSmtp = ref(false);
 const pageError = ref('');
 
 const form = reactive({
@@ -80,6 +81,20 @@ async function syncReplies() {
   }
 }
 
+async function checkSmtp() {
+  checkingSmtp.value = true;
+  pageError.value = '';
+  try {
+    const { data } = await api.post('/admin/meetings/smtp-check');
+    notifySuccess(data.message, 'Mail server ready');
+  } catch (error) {
+    pageError.value = error.response?.data?.message || error.message;
+    notifyError(pageError.value, 'Mail server check failed');
+  } finally {
+    checkingSmtp.value = false;
+  }
+}
+
 function displayDate(value) {
   return value || '—';
 }
@@ -119,6 +134,7 @@ onMounted(loadInvitations);
       <section class="meeting-toolbar">
         <router-link class="button-link" to="/admin">Back to Admin</router-link>
         <div class="meeting-toolbar-actions">
+          <button :disabled="checkingSmtp" @click="checkSmtp">{{ checkingSmtp ? 'Checking SMTP…' : 'Test mail settings' }}</button>
           <button :disabled="loading" @click="loadInvitations">{{ loading ? 'Refreshing…' : 'Refresh list' }}</button>
           <button class="primary" :disabled="syncing" @click="syncReplies">{{ syncing ? 'Checking mailbox…' : 'Sync Outlook replies' }}</button>
         </div>

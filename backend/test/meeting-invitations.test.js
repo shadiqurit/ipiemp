@@ -6,6 +6,7 @@ import {
   buildInvitationCard,
   buildInvitationHtml,
   createInvitationIdentity,
+  describeMailTransportError,
   hashInvitationToken,
   identityMatchesInvitation,
   normalizeEmail
@@ -90,6 +91,12 @@ test('confirmation card contains the saved answer and no actions', () => {
   const card = buildConfirmationCard('MAYBE');
   assert.equal(card.actions, undefined);
   assert.match(JSON.stringify(card), /MAYBE/);
+});
+
+test('returns safe, useful SMTP diagnostics', () => {
+  assert.match(describeMailTransportError({ code: 'EAUTH', responseCode: 535 }), /login failed/i);
+  assert.match(describeMailTransportError({ code: 'ESOCKET' }), /secure SMTP connection failed/i);
+  assert.match(describeMailTransportError({ responseCode: 550 }), /sender or recipient/i);
 });
 
 test('builds a standard Outlook calendar request', () => {

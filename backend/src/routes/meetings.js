@@ -10,6 +10,7 @@ import {
   buildInvitationHtml,
   createInvitationIdentity,
   createMailTransport,
+  describeMailTransportError,
   getOptionalOutlookSettings,
   getOutlookSettings,
   hashInvitationToken,
@@ -137,7 +138,12 @@ meetingAdminRoutes.post('/send', async (req, res, next) => {
 
     } catch (mailError) {
       await pool.execute(`DELETE FROM meeting_invitation WHERE INVITE_ID = ?`, [inviteId]);
-      const error = new Error('The mail server could not send the invitation. Check the SMTP host, port, account, and password.');
+      console.error('SMTP invitation send failed:', {
+        code: mailError.code || null,
+        command: mailError.command || null,
+        responseCode: mailError.responseCode || null
+      });
+      const error = new Error(describeMailTransportError(mailError));
       error.status = 502;
       throw error;
     }
@@ -160,6 +166,26 @@ meetingAdminRoutes.post('/send', async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+});
+
+meetingAdminRoutes.post('/smtp-check', async (req, res, next) => {
+  let transporter;
+  try {
+    ({ transporter } = createMailTransport());
+    await transporter.verify();
+    res.json({ ok: true, message: 'SMTP connection and mailbox login are working.' });
+  } catch (mailError) {
+    console.error('SMTP verification failed:', {
+      code: mailError.code || null,
+      command: mailError.command || null,
+      responseCode: mailError.responseCode || null
+    });
+    const error = new Error(describeMailTransportError(mailError));
+    error.status = 502;
+    next(error);
+  } finally {
+    transporter?.close();
   }
 });
 

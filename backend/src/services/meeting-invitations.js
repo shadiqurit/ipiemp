@@ -231,3 +231,26 @@ export function createMailTransport() {
     })
   };
 }
+
+export function describeMailTransportError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const responseCode = Number(error?.responseCode || 0);
+
+  if (code === 'EAUTH' || [534, 535].includes(responseCode)) {
+    return 'SMTP login failed. Verify the full mailbox username and mailbox password.';
+  }
+  if (code === 'ETIMEDOUT' || code === 'ECONNECTION') {
+    return 'The SMTP server connection timed out. Verify the SMTP hostname and port.';
+  }
+  if (code === 'EDNS') {
+    return 'The SMTP hostname could not be resolved.';
+  }
+  if (code === 'ESOCKET' || code === 'ETLS') {
+    return 'The secure SMTP connection failed. Verify the hostname, port, and TLS settings.';
+  }
+  if (code === 'EENVELOPE' || responseCode === 550 || responseCode === 553) {
+    return `The mail server rejected the sender or recipient${responseCode ? ` (SMTP ${responseCode})` : ''}.`;
+  }
+  if (responseCode) return `The mail server rejected the message (SMTP ${responseCode}).`;
+  return `The mail server could not send the invitation${code ? ` (${code})` : ''}.`;
+}
