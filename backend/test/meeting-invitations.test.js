@@ -7,6 +7,7 @@ import {
   buildInvitationHtml,
   createInvitationIdentity,
   hashInvitationToken,
+  identityMatchesInvitation,
   normalizeEmail
 } from '../src/services/meeting-invitations.js';
 
@@ -63,9 +64,29 @@ test('normalizes valid email and rejects malformed email', () => {
   assert.throws(() => normalizeEmail('not an email'), /valid recipient email/);
 });
 
+test('matches a recipient by object ID when supplied', () => {
+  const invitation = {
+    RECIPIENT_EMAIL: 'user@example.com',
+    RECIPIENT_OBJECT_ID: '33333333-3333-4333-8333-333333333333'
+  };
+  assert.equal(identityMatchesInvitation(invitation, {
+    oid: '33333333-3333-4333-8333-333333333333',
+    preferred_username: 'different@example.com'
+  }), true);
+  assert.equal(identityMatchesInvitation(invitation, {
+    oid: '44444444-4444-4444-8444-444444444444',
+    preferred_username: 'user@example.com'
+  }), false);
+});
+
+test('falls back to signed email claims when object ID is omitted', () => {
+  const invitation = { RECIPIENT_EMAIL: 'user@example.com', RECIPIENT_OBJECT_ID: null };
+  assert.equal(identityMatchesInvitation(invitation, { preferred_username: 'USER@example.com' }), true);
+  assert.equal(identityMatchesInvitation(invitation, { upn: 'other@example.com' }), false);
+});
+
 test('confirmation card contains the saved answer and no actions', () => {
   const card = buildConfirmationCard('MAYBE');
   assert.equal(card.actions, undefined);
   assert.match(JSON.stringify(card), /MAYBE/);
 });
-

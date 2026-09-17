@@ -1,0 +1,3 @@
+ALTER TABLE meeting_invitation
+  MODIFY RECIPIENT_OBJECT_ID CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL;
+

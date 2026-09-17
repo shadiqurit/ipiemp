@@ -105,7 +105,7 @@ onMounted(loadInvitations);
         <div class="section-title">
           <div>
             <h2>Send an invitation</h2>
-            <p class="muted">The recipient must be a registered Microsoft 365 test user. The Object ID binds the invitation to that exact Microsoft account.</p>
+            <p class="muted">The recipient must be a registered Microsoft 365 test user. If you know the user's Entra Object ID, add it for the strongest identity check.</p>
           </div>
         </div>
 
@@ -127,9 +127,9 @@ onMounted(loadInvitations);
             <input id="meeting-recipient" v-model.trim="form.recipientEmail" type="email" autocomplete="email" required />
           </div>
           <div class="field meeting-object-field">
-            <label for="meeting-object-id">Microsoft Entra Object ID <span class="required-mark">*</span></label>
-            <input id="meeting-object-id" v-model.trim="form.recipientObjectId" placeholder="00000000-0000-0000-0000-000000000000" pattern="[0-9a-fA-F-]{36}" autocomplete="off" required />
-            <small class="field-hint">Find this user ID in Microsoft Entra admin center → Users → select user → Object ID.</small>
+            <label for="meeting-object-id">Microsoft Entra Object ID <small class="optional-mark">Optional</small></label>
+            <input id="meeting-object-id" v-model.trim="form.recipientObjectId" placeholder="Leave blank to verify by signed email claim" pattern="[0-9a-fA-F-]{36}" autocomplete="off" />
+            <small class="field-hint">When blank, the API matches the recipient email to the signed Microsoft preferred username, UPN, or email claim.</small>
           </div>
           <div class="field">
             <label for="meeting-expiry">Valid for</label>
@@ -214,4 +214,3 @@ onMounted(loadInvitations);
   .meeting-send-row { align-items: stretch; flex-direction: column; }
 }
 </style>
-

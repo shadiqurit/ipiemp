@@ -12,6 +12,7 @@ import {
   createMailTransport,
   getOutlookSettings,
   hashInvitationToken,
+  identityMatchesInvitation,
   isUuid,
   normalizeEmail
 } from '../services/meeting-invitations.js';
@@ -38,14 +39,14 @@ function normalizeMeetingInput(body) {
   if (meetingTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(meetingTime)) {
     throw Object.assign(new Error('Meeting time must use 24-hour HH:MM.'), { status: 400 });
   }
-  if (!isUuid(recipientObjectId)) {
-    throw Object.assign(new Error('Recipient Microsoft Entra Object ID must be a UUID.'), { status: 400 });
+  if (recipientObjectId && !isUuid(recipientObjectId)) {
+    throw Object.assign(new Error('Recipient Microsoft Entra Object ID must be a UUID when provided.'), { status: 400 });
   }
   if (!Number.isInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 30) {
     throw Object.assign(new Error('Invitation validity must be between 1 and 30 days.'), { status: 400 });
   }
 
-  return { title, meetingDate: meetingDate || null, meetingTime: meetingTime || null, recipientEmail, recipientObjectId, expiresInDays };
+  return { title, meetingDate: meetingDate || null, meetingTime: meetingTime || null, recipientEmail, recipientObjectId: recipientObjectId || null, expiresInDays };
 }
 
 meetingAdminRoutes.get('/', async (req, res, next) => {
@@ -198,35 +199,42 @@ meetingActionRoutes.post('/respond', async (req, res) => {
   try {
     const settings = getOutlookSettings();
     const identity = await verifyMicrosoftIdentity(req, settings);
-    const key = [inviteId, hashInvitationToken(token), settings.tenantId, String(identity.oid).toLowerCase()];
-
-    const [result] = await pool.execute(
-      `UPDATE meeting_invitation
-          SET RESPONSE_STATUS = ?, RESPONDED_AT = UTC_TIMESTAMP()
-        WHERE INVITE_ID = ?
-          AND TOKEN_HASH = ?
-          AND TENANT_ID = ?
-          AND RECIPIENT_OBJECT_ID = ?
+    const key = [inviteId, hashInvitationToken(token), settings.tenantId];
+    const [rows] = await pool.execute(
+      `SELECT RECIPIENT_EMAIL, RECIPIENT_OBJECT_ID, RESPONSE_STATUS
+         FROM meeting_invitation
+        WHERE INVITE_ID = ? AND TOKEN_HASH = ? AND TENANT_ID = ?
           AND EXPIRES_AT > UTC_TIMESTAMP()
-          AND RESPONSE_STATUS = 'PENDING'`,
-      [response, ...key]
+        LIMIT 1`,
+      key
     );
 
-    if (!result.affectedRows) {
-      const [rows] = await pool.execute(
-        `SELECT RESPONSE_STATUS
-           FROM meeting_invitation
+    const invitation = rows[0];
+    if (!invitation || !identityMatchesInvitation(invitation, identity)) {
+      return actionError(res, 403, 'This invitation is invalid, expired, or belongs to another user.');
+    }
+    if (invitation.RESPONSE_STATUS !== 'PENDING') {
+      if (invitation.RESPONSE_STATUS !== response) {
+        return actionError(res, 409, 'A different response has already been recorded.');
+      }
+    } else {
+      const [result] = await pool.execute(
+        `UPDATE meeting_invitation
+            SET RESPONSE_STATUS = ?, RESPONDED_AT = UTC_TIMESTAMP()
           WHERE INVITE_ID = ? AND TOKEN_HASH = ? AND TENANT_ID = ?
-            AND RECIPIENT_OBJECT_ID = ? AND EXPIRES_AT > UTC_TIMESTAMP()
-          LIMIT 1`,
-        key
+            AND EXPIRES_AT > UTC_TIMESTAMP()
+            AND RESPONSE_STATUS = 'PENDING'`,
+        [response, ...key]
       );
 
-      if (!rows.length) {
-        return actionError(res, 403, 'This invitation is invalid, expired, or belongs to another user.');
-      }
-      if (rows[0].RESPONSE_STATUS !== response) {
-        return actionError(res, 409, 'A different response has already been recorded.');
+      if (!result.affectedRows) {
+        const [latestRows] = await pool.execute(
+          `SELECT RESPONSE_STATUS FROM meeting_invitation WHERE INVITE_ID = ? LIMIT 1`,
+          [inviteId]
+        );
+        if (latestRows[0]?.RESPONSE_STATUS !== response) {
+          return actionError(res, 409, 'A different response has already been recorded.');
+        }
       }
     }
 

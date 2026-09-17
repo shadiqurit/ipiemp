@@ -233,6 +233,13 @@ For an existing database, apply the non-destructive migration:
 mysql -u employee_portal_app -p employee_portal < database/migration_add_meeting_invitations.sql
 ```
 
+If the first meeting migration was already applied before Object ID became
+optional, also run:
+
+```bash
+mysql -u employee_portal_app -p employee_portal < database/migration_allow_meeting_email_identity.sql
+```
+
 Add these values to `backend/.env` on the server:
 
 ```dotenv
@@ -259,10 +266,11 @@ preauthorize the Outlook Actions application ID
 `48af08dc-f6d2-435f-b2a7-069abd99c086`. Microsoft documents the current setup
 in [Enable Microsoft Entra ID token for Actionable Messages](https://learn.microsoft.com/en-us/outlook/actionable-messages/enable-entra-token-for-actionable-messages).
 
-The form also requires the recipient's Microsoft Entra Object ID. This binds
-the unique invitation token to the Microsoft identity that clicks the Outlook
-button. Invitations expire after the selected period, and the first recorded
-answer cannot be changed by replaying a different action.
+The recipient's Microsoft Entra Object ID is optional. When provided, it binds
+the invitation to that immutable identity. When omitted, the API compares the
+recipient email with the signed `preferred_username`, `upn`, or `email` claim
+from Microsoft. Invitations expire after the selected period, and the first
+recorded answer cannot be changed by replaying a different action.
 
 ## Deploy to a physical server or VPS
 

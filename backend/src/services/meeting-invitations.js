@@ -19,6 +19,20 @@ export function normalizeEmail(value) {
   return email;
 }
 
+export function identityMatchesInvitation(invitation, identity) {
+  const expectedObjectId = String(invitation.RECIPIENT_OBJECT_ID || '').trim().toLowerCase();
+  const actualObjectId = String(identity?.oid || '').trim().toLowerCase();
+
+  if (expectedObjectId) return expectedObjectId === actualObjectId;
+
+  const expectedEmail = String(invitation.RECIPIENT_EMAIL || '').trim().toLowerCase();
+  const claimedEmails = [identity?.preferred_username, identity?.upn, identity?.email]
+    .map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean);
+
+  return Boolean(expectedEmail) && claimedEmails.includes(expectedEmail);
+}
+
 export function hashInvitationToken(token) {
   return createHash('sha256').update(String(token), 'utf8').digest('hex');
 }
@@ -203,4 +217,3 @@ export function createMailTransport() {
     })
   };
 }
-
