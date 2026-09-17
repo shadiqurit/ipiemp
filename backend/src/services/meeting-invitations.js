@@ -54,8 +54,8 @@ function requireSetting(name, aliases = []) {
   throw Object.assign(new Error(`Server setting ${name} is required.`), { status: 503 });
 }
 
-function validPublicBaseUrl() {
-  const raw = requireSetting('PUBLIC_BASE_URL');
+export function getPublicBaseUrl() {
+  const raw = requireSetting('PUBLIC_BASE_URL', ['FRONTEND_ORIGIN']);
   let url;
   try {
     url = new URL(raw);
@@ -89,7 +89,7 @@ export function getOutlookSettings() {
     tenantId: tenantId.toLowerCase(),
     audience,
     scope,
-    responseUrl: new URL('/api/meeting/respond', validPublicBaseUrl()).href
+    responseUrl: new URL('/api/meeting/respond', getPublicBaseUrl()).href
   };
 }
 
@@ -177,6 +177,20 @@ export function buildConfirmationCard(response) {
   };
 }
 
+export function buildWebResponseUrls(invitation, baseUrl = getPublicBaseUrl()) {
+  const urls = {};
+
+  for (const response of RESPONSE_VALUES) {
+    const url = new URL('/meeting-response', baseUrl);
+    url.searchParams.set('invite', invitation.inviteId);
+    url.searchParams.set('token', invitation.token);
+    url.searchParams.set('response', response);
+    urls[response] = url.href;
+  }
+
+  return urls;
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -192,9 +206,18 @@ export function buildInvitationHtml(invitation, card = null) {
     ? `<script type="application/adaptivecard+json">${JSON.stringify(card).replaceAll('<', '\\u003c')}</script>`
     : '';
   const details = [
-    invitation.meetingDate ? `<p><strong>Date:</strong> ${escapeHtml(invitation.meetingDate)}</p>` : '',
-    invitation.meetingTime ? `<p><strong>Time:</strong> ${escapeHtml(invitation.meetingTime)}</p>` : ''
+    invitation.meetingDate ? `<tr><td style="padding:7px 0;color:#607089;width:72px">Date</td><td style="padding:7px 0;color:#17223b;font-weight:700">${escapeHtml(invitation.meetingDate)}</td></tr>` : '',
+    invitation.meetingTime ? `<tr><td style="padding:7px 0;color:#607089;width:72px">Time</td><td style="padding:7px 0;color:#17223b;font-weight:700">${escapeHtml(invitation.meetingTime)}</td></tr>` : ''
   ].join('');
+  const responseUrls = invitation.responseUrls || {};
+  const buttons = [
+    ['YES', 'Yes, I will join', '#138a62'],
+    ['NO', 'No, I cannot join', '#c2413a'],
+    ['MAYBE', 'Maybe', '#d18a12']
+  ].filter(([response]) => responseUrls[response]).map(([response, label, color]) => `
+      <td align="center" style="padding:6px">
+        <a href="${escapeHtml(responseUrls[response])}" style="display:block;padding:13px 17px;border-radius:8px;background:${color};color:#ffffff;font-family:Arial,sans-serif;font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap">${label}</a>
+      </td>`).join('');
 
   return `<!doctype html>
 <html>
@@ -202,11 +225,25 @@ export function buildInvitationHtml(invitation, card = null) {
   <meta charset="utf-8">
   ${cardScript}
 </head>
-<body style="font-family:Arial,sans-serif;color:#17223b;line-height:1.5">
-  <h2>${escapeHtml(invitation.title)}</h2>
-  <p>Do you want to join the meeting?</p>
-  ${details}
-  <p>Open the calendar invitation in Outlook to select Accept, Tentative, or Decline.</p>
+<body style="margin:0;padding:0;background:#edf3f9;font-family:Arial,sans-serif;color:#17223b;line-height:1.5">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#edf3f9">
+    <tr><td align="center" style="padding:32px 12px">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(16,42,67,.12)">
+        <tr><td style="padding:29px 32px;background:#163f73;color:#ffffff">
+          <div style="font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#bcd6f5">IBN SINA</div>
+          <div style="margin-top:6px;font-size:27px;font-weight:700">Meeting Invitation</div>
+        </td></tr>
+        <tr><td style="padding:31px 32px">
+          <div style="font-size:22px;font-weight:700;color:#102a43">${escapeHtml(invitation.title)}</div>
+          <p style="margin:10px 0 21px;color:#52657d">Do you want to join this meeting?</p>
+          ${details ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="width:100%;padding:12px 16px;margin-bottom:22px;border:1px solid #dbe7f3;border-radius:10px;background:#f7faff">${details}</table>` : ''}
+          ${buttons ? `<table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto"><tr>${buttons}</tr></table>
+          <p style="margin:17px 0 0;text-align:center;color:#758397;font-size:12px">A secure confirmation page opens before your response is saved.</p>` : ''}
+          <p style="margin:23px 0 0;padding-top:19px;border-top:1px solid #e4ebf2;color:#607089;font-size:13px">You can also use Outlook's calendar controls to select Accept, Tentative, or Decline.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
 </body>
 </html>`;
 }

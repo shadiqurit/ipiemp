@@ -227,8 +227,11 @@ save the latest response in MySQL.
 
 This calendar workflow does not require a Microsoft Actionable Message
 Provider ID, Entra application, or recipient Object ID. SMTP sends invitations;
-IMAP reads replies. The generated message also includes a normal HTML body for
-mail clients that do not display calendar controls.
+IMAP reads replies. The generated message also includes a colorful HTML body
+with **Yes**, **No**, and **Maybe** buttons. A button opens a secure
+confirmation page and the final confirmation saves the response directly in
+MySQL. The confirmation step is intentional: mail security scanners often
+open links automatically, so a GET request must never record a response.
 
 For an existing database, apply the non-destructive migration:
 
@@ -258,6 +261,7 @@ SMTP_PORT=465
 SMTP_USER=info@shadiqur.bd
 SMTP_PASSWORD=YOUR_MAILBOX_PASSWORD
 SMTP_FROM_EMAIL=info@shadiqur.bd
+PUBLIC_BASE_URL=https://ibnsina.shadiqur.bd
 
 IMAP_HOST=YOUR_MAIL_PROVIDER_IMAP_HOST
 IMAP_PORT=993

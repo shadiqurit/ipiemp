@@ -8,6 +8,7 @@ import {
   buildConfirmationCard,
   buildInvitationCard,
   buildInvitationHtml,
+  buildWebResponseUrls,
   createInvitationIdentity,
   createMailTransport,
   describeMailTransportError,
@@ -22,6 +23,7 @@ import { buildCalendarInvitation, syncCalendarReplies } from '../services/calend
 
 export const meetingAdminRoutes = Router();
 export const meetingActionRoutes = Router();
+export const meetingPublicRoutes = Router();
 
 meetingAdminRoutes.use(requireAdmin);
 
@@ -86,6 +88,7 @@ meetingAdminRoutes.post('/send', async (req, res, next) => {
       ...identity,
       calendarUid: `${identity.inviteId}@${senderDomain}`
     };
+    invitation.responseUrls = buildWebResponseUrls(invitation);
     const card = settings ? buildInvitationCard(invitation, settings) : null;
     const html = buildInvitationHtml(invitation, card);
     const calendarContent = buildCalendarInvitation(invitation, sender);
@@ -205,6 +208,104 @@ meetingAdminRoutes.post('/sync-replies', async (req, res, next) => {
       wrapped.status = 502;
       return next(wrapped);
     }
+    next(error);
+  }
+});
+
+function parseWebResponseRequest(req, includeResponse = false) {
+  const inviteId = String(req.params?.inviteId || '').trim().toLowerCase();
+  const token = String(req.method === 'GET' ? req.query?.token : req.body?.token || '');
+  const response = String(req.method === 'GET' ? req.query?.response : req.body?.response || '')
+    .trim()
+    .toUpperCase();
+
+  if (!isUuid(inviteId) || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    throw Object.assign(new Error('This meeting invitation link is invalid.'), { status: 400 });
+  }
+  if (includeResponse && !RESPONSE_VALUES.includes(response)) {
+    throw Object.assign(new Error('Select Yes, No, or Maybe.'), { status: 400 });
+  }
+
+  return { inviteId, token, response };
+}
+
+meetingPublicRoutes.get('/:inviteId', async (req, res, next) => {
+  try {
+    const { inviteId, token } = parseWebResponseRequest(req);
+    const [rows] = await pool.execute(
+      `SELECT INVITE_ID, MEETING_TITLE,
+              DATE_FORMAT(MEETING_DATE, '%Y-%m-%d') AS MEETING_DATE,
+              TIME_FORMAT(MEETING_TIME, '%H:%i') AS MEETING_TIME,
+              RECIPIENT_EMAIL, RESPONSE_STATUS, RESPONDED_AT,
+              (EXPIRES_AT <= UTC_TIMESTAMP()) AS IS_EXPIRED
+         FROM meeting_invitation
+        WHERE INVITE_ID = ? AND TOKEN_HASH = ?
+        LIMIT 1`,
+      [inviteId, hashInvitationToken(token)]
+    );
+
+    const invitation = rows[0];
+    if (!invitation) {
+      return res.status(404).set('Cache-Control', 'no-store').json({ message: 'This meeting invitation link is invalid.' });
+    }
+    if (invitation.IS_EXPIRED) {
+      return res.status(410).set('Cache-Control', 'no-store').json({ message: 'This meeting invitation has expired.' });
+    }
+
+    return res.set('Cache-Control', 'no-store').json({
+      inviteId: invitation.INVITE_ID,
+      title: invitation.MEETING_TITLE,
+      meetingDate: invitation.MEETING_DATE,
+      meetingTime: invitation.MEETING_TIME,
+      recipientEmail: invitation.RECIPIENT_EMAIL,
+      responseStatus: invitation.RESPONSE_STATUS,
+      respondedAt: invitation.RESPONDED_AT
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+meetingPublicRoutes.post('/:inviteId/respond', async (req, res, next) => {
+  try {
+    const { inviteId, token, response } = parseWebResponseRequest(req, true);
+    const tokenHash = hashInvitationToken(token);
+    const [result] = await pool.execute(
+      `UPDATE meeting_invitation
+          SET RESPONSE_STATUS = ?, RESPONDED_AT = UTC_TIMESTAMP()
+        WHERE INVITE_ID = ? AND TOKEN_HASH = ?
+          AND EXPIRES_AT > UTC_TIMESTAMP()
+          AND RESPONSE_STATUS = 'PENDING'`,
+      [response, inviteId, tokenHash]
+    );
+
+    if (!result.affectedRows) {
+      const [rows] = await pool.execute(
+        `SELECT RESPONSE_STATUS,
+                (EXPIRES_AT <= UTC_TIMESTAMP()) AS IS_EXPIRED
+           FROM meeting_invitation
+          WHERE INVITE_ID = ? AND TOKEN_HASH = ?
+          LIMIT 1`,
+        [inviteId, tokenHash]
+      );
+      const invitation = rows[0];
+      if (!invitation) {
+        return res.status(404).set('Cache-Control', 'no-store').json({ message: 'This meeting invitation link is invalid.' });
+      }
+      if (invitation.IS_EXPIRED) {
+        return res.status(410).set('Cache-Control', 'no-store').json({ message: 'This meeting invitation has expired.' });
+      }
+      if (invitation.RESPONSE_STATUS !== response) {
+        return res.status(409).set('Cache-Control', 'no-store').json({ message: `A ${invitation.RESPONSE_STATUS} response has already been recorded.` });
+      }
+    }
+
+    return res.set('Cache-Control', 'no-store').json({
+      ok: true,
+      response,
+      message: 'Thank you. Your response has been recorded.'
+    });
+  } catch (error) {
     next(error);
   }
 });

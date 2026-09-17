@@ -5,6 +5,7 @@ import {
   buildConfirmationCard,
   buildInvitationCard,
   buildInvitationHtml,
+  buildWebResponseUrls,
   createInvitationIdentity,
   describeMailTransportError,
   hashInvitationToken,
@@ -59,6 +60,27 @@ test('escapes HTML and prevents script element termination', () => {
   assert.doesNotMatch(html, /<img src=x/);
   assert.equal((html.match(/<\/script>/g) || []).length, 1);
   assert.match(html, /\\u003c\/script>/);
+});
+
+test('builds colorful secure web response buttons', () => {
+  const invitation = {
+    inviteId: '33333333-3333-4333-8333-333333333333',
+    token: 'b'.repeat(43),
+    title: 'HRMS Project Meeting',
+    meetingDate: '2026-09-20',
+    meetingTime: '10:00'
+  };
+  invitation.responseUrls = buildWebResponseUrls(invitation, 'https://ibnsina.shadiqur.bd');
+  const html = buildInvitationHtml(invitation);
+
+  assert.match(html, /Yes, I will join/);
+  assert.match(html, /No, I cannot join/);
+  assert.match(html, />Maybe</);
+  assert.match(html, /background:#138a62/);
+  assert.match(html, /background:#c2413a/);
+  assert.match(html, /background:#d18a12/);
+  assert.match(html, /response=YES/);
+  assert.match(html, /&amp;token=/);
 });
 
 test('normalizes valid email and rejects malformed email', () => {
