@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
 import publicRoutes from './routes/public.js';
 import adminRoutes from './routes/admin.js';
+import { meetingActionRoutes, meetingAdminRoutes } from './routes/meetings.js';
 
 const app = express();
 
@@ -75,7 +76,14 @@ app.use('/api/public', rateLimit({
 app.get('/health', (req, res) => res.json({ ok: true }));
 app.get('/api', (req, res) => res.json({ ok: true, service: 'Employee Portal API' }));
 app.use('/api/public', publicRoutes);
+app.use('/api/admin/meetings', meetingAdminRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/meeting', rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false
+}), meetingActionRoutes);
 
 // In a single-domain deployment, Express serves the production Vue build as
 // well as the API. Support both the repository layout (frontend/dist) and the
