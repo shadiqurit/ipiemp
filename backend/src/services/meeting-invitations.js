@@ -198,7 +198,7 @@ export function buildInvitationHtml(invitation, card) {
 }
 
 export function createMailTransport() {
-  const host = String(process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+  const host = requireSetting('SMTP_HOST');
   const port = Number(process.env.SMTP_PORT || 465);
   const user = requireSetting('SMTP_USER', ['GMAIL_USER']);
   const pass = requireSetting('SMTP_PASSWORD', ['GMAIL_APP_PASSWORD']);

@@ -116,7 +116,7 @@ meetingAdminRoutes.post('/send', async (req, res, next) => {
 
     } catch (mailError) {
       await pool.execute(`DELETE FROM meeting_invitation WHERE INVITE_ID = ?`, [inviteId]);
-      const error = new Error('Gmail could not send the invitation. Check the SMTP account and app password.');
+      const error = new Error('The mail server could not send the invitation. Check the SMTP host, port, account, and password.');
       error.status = 502;
       throw error;
     }

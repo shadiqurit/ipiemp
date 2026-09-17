@@ -81,7 +81,7 @@ onMounted(loadInvitations);
       <div>
         <span class="badge">OUTLOOK ACTIONABLE MESSAGE</span>
         <h1>Meeting Invitation Test</h1>
-        <p>Send a personalized Gmail message with Yes, No, and Maybe actions that post directly from Outlook to this application.</p>
+        <p>Send a personalized email with Yes, No, and Maybe actions that post directly from Outlook to this application.</p>
       </div>
       <div class="status">
         <b>{{ token ? 'ADMIN READY' : 'LOGIN REQUIRED' }}</b>
@@ -144,7 +144,7 @@ onMounted(loadInvitations);
           <div class="meeting-send-row">
             <p v-if="pageError" class="meeting-error" role="alert">{{ pageError }}</p>
             <button class="primary" type="submit" :disabled="sending">
-              {{ sending ? 'Sending through Gmail…' : 'Send invitation' }}
+              {{ sending ? 'Sending through SMTP…' : 'Send invitation' }}
             </button>
           </div>
         </form>

@@ -216,16 +216,16 @@ mysql -u root -p < database/schema.sql
 
 If you already have real data in the earlier MySQL schema, do not drop it. Create a migration script instead.
 
-## Outlook meeting invitations sent through Gmail
+## Outlook meeting invitations sent through SMTP
 
 Administrators can open `/meeting-test` after signing in at `/admin`. The page
-sends a personalized HTML email through Gmail SMTP. Outlook renders the
+sends a personalized HTML email through the configured SMTP mailbox. Outlook renders the
 embedded Adaptive Card and posts Yes, No, or Maybe directly to
 `/api/meeting/respond`; the latest response is shown on the same admin page.
 
-A saved template pasted into Gmail Compose is not sufficient because Gmail's
-editor does not preserve the Adaptive Card script element. The application
-generates the HTML template and sends it through the configured Gmail account.
+A template pasted into a webmail or desktop compose editor is not sufficient
+because mail editors commonly remove the Adaptive Card script element. The
+application generates the complete HTML template and sends it through SMTP.
 
 For an existing database, apply the non-destructive migration:
 
@@ -243,11 +243,11 @@ mysql -u employee_portal_app -p employee_portal < database/migration_allow_meeti
 Add these values to `backend/.env` on the server:
 
 ```dotenv
-SMTP_HOST=smtp.gmail.com
+SMTP_HOST=YOUR_MAIL_PROVIDER_SMTP_HOST
 SMTP_PORT=465
-SMTP_USER=your-personal-address@gmail.com
-SMTP_PASSWORD=YOUR_GMAIL_APP_PASSWORD
-SMTP_FROM_EMAIL=your-personal-address@gmail.com
+SMTP_USER=info@shadiqur.bd
+SMTP_PASSWORD=YOUR_MAILBOX_PASSWORD
+SMTP_FROM_EMAIL=info@shadiqur.bd
 
 PUBLIC_BASE_URL=https://ibnsina.shadiqur.bd
 OUTLOOK_PROVIDER_ID=YOUR_ACTIONABLE_MESSAGE_PROVIDER_ID
@@ -256,8 +256,9 @@ OUTLOOK_ENTRA_AUDIENCE=YOUR_PROVIDER_APP_ID_URI
 OUTLOOK_ENTRA_SCOPE=Meeting.Respond
 ```
 
-Use a Gmail app password, never the Gmail account password. Before sending to
-another mailbox, register the static Gmail sender and
+Use the SMTP hostname, port, and encryption setting shown by your mailbox
+provider. Port 465 uses implicit TLS; port 587 uses STARTTLS. Before sending to
+another mailbox, register the static `info@shadiqur.bd` sender and
 `https://ibnsina.shadiqur.bd` target in the
 [Actionable Email Developer Dashboard](https://learn.microsoft.com/en-us/outlook/actionable-messages/email-dev-dashboard).
 Choose the **Test Users** scope and add each Microsoft 365 recipient. In the
