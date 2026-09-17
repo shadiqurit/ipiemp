@@ -93,6 +93,18 @@ export function getOutlookSettings() {
   };
 }
 
+export function getOptionalOutlookSettings() {
+  const required = [
+    'OUTLOOK_PROVIDER_ID',
+    'OUTLOOK_ENTRA_TENANT_ID',
+    'OUTLOOK_ENTRA_AUDIENCE',
+    'OUTLOOK_ENTRA_SCOPE',
+    'PUBLIC_BASE_URL'
+  ];
+  if (!required.every((name) => String(process.env[name] || '').trim())) return null;
+  return getOutlookSettings();
+}
+
 export function buildInvitationCard(invitation, settings = getOutlookSettings()) {
   const facts = [];
   if (invitation.meetingDate) facts.push({ title: 'Date:', value: invitation.meetingDate });
@@ -174,9 +186,11 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
-export function buildInvitationHtml(invitation, card) {
+export function buildInvitationHtml(invitation, card = null) {
   // Prevent user-controlled text from ever terminating the JSON script tag.
-  const cardJson = JSON.stringify(card).replaceAll('<', '\\u003c');
+  const cardScript = card
+    ? `<script type="application/adaptivecard+json">${JSON.stringify(card).replaceAll('<', '\\u003c')}</script>`
+    : '';
   const details = [
     invitation.meetingDate ? `<p><strong>Date:</strong> ${escapeHtml(invitation.meetingDate)}</p>` : '',
     invitation.meetingTime ? `<p><strong>Time:</strong> ${escapeHtml(invitation.meetingTime)}</p>` : ''
@@ -186,13 +200,13 @@ export function buildInvitationHtml(invitation, card) {
 <html>
 <head>
   <meta charset="utf-8">
-  <script type="application/adaptivecard+json">${cardJson}</script>
+  ${cardScript}
 </head>
 <body style="font-family:Arial,sans-serif;color:#17223b;line-height:1.5">
   <h2>${escapeHtml(invitation.title)}</h2>
   <p>Do you want to join the meeting?</p>
   ${details}
-  <p>Open this message in a supported Outlook client to select Yes, No, or Maybe.</p>
+  <p>Open the calendar invitation in Outlook to select Accept, Tentative, or Decline.</p>
 </body>
 </html>`;
 }

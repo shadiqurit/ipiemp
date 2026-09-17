@@ -10,12 +10,14 @@ import {
   buildInvitationHtml,
   createInvitationIdentity,
   createMailTransport,
+  getOptionalOutlookSettings,
   getOutlookSettings,
   hashInvitationToken,
   identityMatchesInvitation,
   isUuid,
   normalizeEmail
 } from '../services/meeting-invitations.js';
+import { buildCalendarInvitation, syncCalendarReplies } from '../services/calendar-invitations.js';
 
 export const meetingAdminRoutes = Router();
 export const meetingActionRoutes = Router();
@@ -29,14 +31,15 @@ function normalizeMeetingInput(body) {
   const recipientEmail = normalizeEmail(body?.recipientEmail);
   const recipientObjectId = String(body?.recipientObjectId || '').trim().toLowerCase();
   const expiresInDays = Number(body?.expiresInDays || 7);
+  const durationMinutes = Number(body?.durationMinutes || 60);
 
   if (!title || title.length > 255 || /[\r\n]/.test(title)) {
     throw Object.assign(new Error('Meeting title must be one line and no more than 255 characters.'), { status: 400 });
   }
-  if (meetingDate && !/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) {
     throw Object.assign(new Error('Meeting date must use YYYY-MM-DD.'), { status: 400 });
   }
-  if (meetingTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(meetingTime)) {
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(meetingTime)) {
     throw Object.assign(new Error('Meeting time must use 24-hour HH:MM.'), { status: 400 });
   }
   if (recipientObjectId && !isUuid(recipientObjectId)) {
@@ -45,8 +48,11 @@ function normalizeMeetingInput(body) {
   if (!Number.isInteger(expiresInDays) || expiresInDays < 1 || expiresInDays > 30) {
     throw Object.assign(new Error('Invitation validity must be between 1 and 30 days.'), { status: 400 });
   }
+  if (!Number.isInteger(durationMinutes) || durationMinutes < 15 || durationMinutes > 1440) {
+    throw Object.assign(new Error('Meeting duration must be between 15 and 1440 minutes.'), { status: 400 });
+  }
 
-  return { title, meetingDate: meetingDate || null, meetingTime: meetingTime || null, recipientEmail, recipientObjectId: recipientObjectId || null, expiresInDays };
+  return { title, meetingDate, meetingTime, recipientEmail, recipientObjectId: recipientObjectId || null, expiresInDays, durationMinutes };
 }
 
 meetingAdminRoutes.get('/', async (req, res, next) => {
@@ -68,21 +74,27 @@ meetingAdminRoutes.post('/send', async (req, res, next) => {
   let inviteId;
   try {
     const meeting = normalizeMeetingInput(req.body);
-    const settings = getOutlookSettings();
+    const settings = getOptionalOutlookSettings();
     const identity = createInvitationIdentity();
     inviteId = identity.inviteId;
 
-    const invitation = { ...meeting, ...identity };
-    const card = buildInvitationCard(invitation, settings);
-    const html = buildInvitationHtml(invitation, card);
     const { transporter, sender } = createMailTransport();
+    const senderDomain = sender.split('@')[1];
+    const invitation = {
+      ...meeting,
+      ...identity,
+      calendarUid: `${identity.inviteId}@${senderDomain}`
+    };
+    const card = settings ? buildInvitationCard(invitation, settings) : null;
+    const html = buildInvitationHtml(invitation, card);
+    const calendarContent = buildCalendarInvitation(invitation, sender);
 
     await pool.execute(
       `INSERT INTO meeting_invitation (
          INVITE_ID, MEETING_TITLE, MEETING_DATE, MEETING_TIME,
-         RECIPIENT_EMAIL, RECIPIENT_OBJECT_ID, TENANT_ID, TOKEN_HASH,
+         RECIPIENT_EMAIL, RECIPIENT_OBJECT_ID, TENANT_ID, TOKEN_HASH, CALENDAR_UID,
          RESPONSE_STATUS, CREATED_BY, CREATED_AT, EXPIRES_AT
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, UTC_TIMESTAMP(),
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, UTC_TIMESTAMP(),
                  DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? DAY))`,
       [
         inviteId,
@@ -91,8 +103,9 @@ meetingAdminRoutes.post('/send', async (req, res, next) => {
         meeting.meetingTime,
         meeting.recipientEmail,
         meeting.recipientObjectId,
-        settings.tenantId,
+        settings?.tenantId || null,
         identity.tokenHash,
+        invitation.calendarUid,
         req.admin.username,
         meeting.expiresInDays
       ]
@@ -109,9 +122,17 @@ meetingAdminRoutes.post('/send', async (req, res, next) => {
           'Do you want to join the meeting?',
           meeting.meetingDate ? `Date: ${meeting.meetingDate}` : '',
           meeting.meetingTime ? `Time: ${meeting.meetingTime}` : '',
-          'Open this message in a supported Outlook client to select Yes, No, or Maybe.'
+          'Open this meeting invitation in Outlook to select Accept, Tentative, or Decline.'
         ].filter(Boolean).join('\n\n'),
-        html
+        html,
+        icalEvent: {
+          filename: 'meeting-invitation.ics',
+          method: 'REQUEST',
+          content: calendarContent
+        },
+        headers: {
+          'Content-Class': 'urn:content-classes:calendarmessage'
+        }
       });
 
     } catch (mailError) {
@@ -138,6 +159,26 @@ meetingAdminRoutes.post('/send', async (req, res, next) => {
       message: `Invitation sent to ${meeting.recipientEmail}.`
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+meetingAdminRoutes.post('/sync-replies', async (req, res, next) => {
+  try {
+    const result = await syncCalendarReplies();
+    res.json({
+      ok: true,
+      ...result,
+      message: result.updated
+        ? `${result.updated} Outlook response(s) synchronized.`
+        : 'No new Outlook responses were found.'
+    });
+  } catch (error) {
+    if (!error.status) {
+      const wrapped = new Error('Could not read Outlook replies. Check the IMAP settings for the sender mailbox.');
+      wrapped.status = 502;
+      return next(wrapped);
+    }
     next(error);
   }
 });

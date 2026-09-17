@@ -216,16 +216,19 @@ mysql -u root -p < database/schema.sql
 
 If you already have real data in the earlier MySQL schema, do not drop it. Create a migration script instead.
 
-## Outlook meeting invitations sent through SMTP
+## Outlook calendar invitations sent from the website
 
-Administrators can open `/meeting-test` after signing in at `/admin`. The page
-sends a personalized HTML email through the configured SMTP mailbox. Outlook renders the
-embedded Adaptive Card and posts Yes, No, or Maybe directly to
-`/api/meeting/respond`; the latest response is shown on the same admin page.
+Administrators can open `/meeting-test` after signing in at `/admin`, assign a
+recipient, and send a standard iCalendar meeting request through the configured
+SMTP mailbox. Outlook displays **Accept**, **Tentative**, and **Decline** in the
+app. The recipient's calendar reply is delivered to the sender mailbox. Select
+**Sync Outlook replies** on the page to read those replies through IMAP and
+save the latest response in MySQL.
 
-A template pasted into a webmail or desktop compose editor is not sufficient
-because mail editors commonly remove the Adaptive Card script element. The
-application generates the complete HTML template and sends it through SMTP.
+This calendar workflow does not require a Microsoft Actionable Message
+Provider ID, Entra application, or recipient Object ID. SMTP sends invitations;
+IMAP reads replies. The generated message also includes a normal HTML body for
+mail clients that do not display calendar controls.
 
 For an existing database, apply the non-destructive migration:
 
@@ -240,6 +243,13 @@ optional, also run:
 mysql -u employee_portal_app -p employee_portal < database/migration_allow_meeting_email_identity.sql
 ```
 
+If any earlier version of the meeting table already exists, add calendar reply
+support once:
+
+```bash
+mysql -u employee_portal_app -p employee_portal < database/migration_add_calendar_reply_sync.sql
+```
+
 Add these values to `backend/.env` on the server:
 
 ```dotenv
@@ -249,29 +259,28 @@ SMTP_USER=info@shadiqur.bd
 SMTP_PASSWORD=YOUR_MAILBOX_PASSWORD
 SMTP_FROM_EMAIL=info@shadiqur.bd
 
-PUBLIC_BASE_URL=https://ibnsina.shadiqur.bd
-OUTLOOK_PROVIDER_ID=YOUR_ACTIONABLE_MESSAGE_PROVIDER_ID
-OUTLOOK_ENTRA_TENANT_ID=YOUR_MICROSOFT_TENANT_ID
-OUTLOOK_ENTRA_AUDIENCE=YOUR_PROVIDER_APP_ID_URI
-OUTLOOK_ENTRA_SCOPE=Meeting.Respond
+IMAP_HOST=YOUR_MAIL_PROVIDER_IMAP_HOST
+IMAP_PORT=993
+IMAP_SECURE=true
+# Leave blank to reuse SMTP_USER and SMTP_PASSWORD.
+IMAP_USER=
+IMAP_PASSWORD=
+MEETING_TIMEZONE=Asia/Dhaka
 ```
 
 Use the SMTP hostname, port, and encryption setting shown by your mailbox
-provider. Port 465 uses implicit TLS; port 587 uses STARTTLS. Before sending to
-another mailbox, register the static `info@shadiqur.bd` sender and
-`https://ibnsina.shadiqur.bd` target in the
-[Actionable Email Developer Dashboard](https://learn.microsoft.com/en-us/outlook/actionable-messages/email-dev-dashboard).
-Choose the **Test Users** scope and add each Microsoft 365 recipient. In the
-associated Entra application, expose the `Meeting.Respond` scope and
-preauthorize the Outlook Actions application ID
-`48af08dc-f6d2-435f-b2a7-069abd99c086`. Microsoft documents the current setup
-in [Enable Microsoft Entra ID token for Actionable Messages](https://learn.microsoft.com/en-us/outlook/actionable-messages/enable-entra-token-for-actionable-messages).
+provider. Port 465 uses implicit TLS; port 587 uses STARTTLS. IMAP normally
+uses TLS on port 993. Many cPanel mailboxes use the same hostname, username,
+and password for SMTP and IMAP; confirm the exact values under **Connect
+Devices**. Keep mailbox passwords only in `backend/.env`.
 
-The recipient's Microsoft Entra Object ID is optional. When provided, it binds
-the invitation to that immutable identity. When omitted, the API compares the
-recipient email with the signed `preferred_username`, `upn`, or `email` claim
-from Microsoft. Invitations expire after the selected period, and the first
-recorded answer cannot be changed by replaying a different action.
+Reply synchronization checks calendar responses from the last 45 days and
+matches both the unique calendar UID and the recipient's From address. A user
+may change an Outlook RSVP later; syncing again records the latest response.
+
+The `OUTLOOK_*` variables in `.env.example` are optional. Configure them only
+if you later register an Actionable Message provider and want direct
+`Action.Http` buttons in addition to the standard calendar RSVP.
 
 ## Deploy to a physical server or VPS
 

@@ -10,6 +10,7 @@ import {
   identityMatchesInvitation,
   normalizeEmail
 } from '../src/services/meeting-invitations.js';
+import { buildCalendarInvitation, parseCalendarReply } from '../src/services/calendar-invitations.js';
 
 const settings = {
   providerId: '11111111-1111-4111-8111-111111111111',
@@ -89,4 +90,37 @@ test('confirmation card contains the saved answer and no actions', () => {
   const card = buildConfirmationCard('MAYBE');
   assert.equal(card.actions, undefined);
   assert.match(JSON.stringify(card), /MAYBE/);
+});
+
+test('builds a standard Outlook calendar request', () => {
+  process.env.MEETING_TIMEZONE = 'Asia/Dhaka';
+  const invitation = {
+    calendarUid: '33333333-3333-4333-8333-333333333333@shadiqur.bd',
+    title: 'HRMS Project Meeting',
+    meetingDate: '2026-09-20',
+    meetingTime: '10:00',
+    durationMinutes: 60,
+    recipientEmail: 'shadiqur.it@ibnsinapharma.com'
+  };
+  const content = buildCalendarInvitation(invitation, 'info@shadiqur.bd');
+  assert.match(content, /METHOD:REQUEST/);
+  assert.match(content, /DTSTART:20260920T040000Z/);
+  assert.match(content, /ORGANIZER;CN=IBN SINA Meeting:mailto:info@shadiqur.bd/);
+  assert.match(content, /RSVP=TRUE:mailto:shadiqur.it@ibnsinapharma.com/);
+});
+
+test('parses an Outlook calendar reply', () => {
+  const reply = parseCalendarReply([
+    'BEGIN:VCALENDAR',
+    'METHOD:REPLY',
+    'BEGIN:VEVENT',
+    'UID:33333333-3333-4333-8333-333333333333@shadiqur.bd',
+    'ATTENDEE;PARTSTAT=TENTATIVE:mailto:shadiqur.it@ibnsinapharma.com',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n'));
+  assert.deepEqual(reply, {
+    uid: '33333333-3333-4333-8333-333333333333@shadiqur.bd',
+    response: 'MAYBE'
+  });
 });

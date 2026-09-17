@@ -17,8 +17,11 @@
     "express": "^5.1.0",
     "express-rate-limit": "^8.0.1",
     "helmet": "^8.1.0",
+    "imapflow": "^2.0.5",
     "jose": "^6.2.12",
     "jsonwebtoken": "^9.0.2",
+    "luxon": "^3.7.2",
+    "mailparser": "^3.9.28",
     "mysql2": "^3.14.3",
     "nodemailer": "^10.0.10",
     "uuid": "^11.1.0"
