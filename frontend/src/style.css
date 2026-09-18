@@ -464,9 +464,35 @@ tbody tr:hover td { background: #f8fbff; }
 .employee-select-all span { font-size: .78rem; font-weight: 760; }
 .employee-bulk-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .employee-bulk-actions button { min-height: 38px; padding: 8px 12px; font-size: .76rem; }
+.employee-mobile-sort { display: none; }
 .employee-table-wrap { min-height: 120px; margin: 0; border: 0; border-radius: 0; }
 .employee-table { min-width: 1120px; }
 .employee-table th { top: 0; height: 44px; padding-top: 10px; padding-bottom: 10px; color: #4a5c72; background: #edf2f7; }
+.employee-table th[aria-sort] { padding: 0; }
+.employee-sort-button {
+  width: 100%;
+  min-height: 44px;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  color: inherit;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+.employee-sort-button span:last-child { color: #8a9bad; font-size: .82rem; font-weight: 900; }
+.employee-sort-button:hover:not(:disabled) { border: 0; background: #e3ebf4; box-shadow: none; transform: none; }
+.employee-sort-button:focus-visible { position: relative; z-index: 1; outline: 3px solid rgb(43 111 218 / 24%); outline-offset: -3px; }
+.employee-table th[aria-sort="ascending"] .employee-sort-button,
+.employee-table th[aria-sort="descending"] .employee-sort-button { color: var(--blue-900); background: #e5eef9; }
+.employee-table th[aria-sort="ascending"] .employee-sort-button span:last-child,
+.employee-table th[aria-sort="descending"] .employee-sort-button span:last-child { color: var(--blue-700); }
 .employee-table td { height: 57px; color: #40536a; }
 .employee-table tbody tr { transition: box-shadow 140ms ease, background 140ms ease; }
 .employee-table tbody tr:hover td { background: #f5f9fd; }
@@ -945,6 +971,11 @@ footer a { color: var(--muted); font-size: .84rem; font-weight: 700; text-decora
   .employee-record-count { min-width: 78px; padding: 9px 11px; }
   .employee-search-panel { padding: 16px 20px; }
   .employee-report-toolbar { align-items: flex-start; flex-direction: column; padding: 12px 20px; }
+  .employee-mobile-sort { display: flex; width: 100%; align-items: flex-end; gap: 8px; }
+  .employee-mobile-sort label { min-width: 0; flex: 1 1 auto; margin: 0; }
+  .employee-mobile-sort label span { display: block; margin-bottom: 5px; color: #607089; font-size: .67rem; font-weight: 820; letter-spacing: .04em; text-transform: uppercase; }
+  .employee-mobile-sort select { min-height: 42px; padding: 8px 10px; }
+  .employee-mobile-sort button { min-height: 42px; padding: 8px 12px; }
   .employee-bulk-actions { width: 100%; justify-content: flex-start; }
   .employee-table-wrap { padding: 13px; overflow: visible; background: #eef3f8; }
   .employee-table { display: block; min-width: 0; }

@@ -44,6 +44,9 @@ const employeeBatchFilter = ref('');
 const employeeSearch = ref('');
 const employeeMeritIdFilter = ref('');
 const employeeClassIdFilter = ref('');
+const employeeSortKey = ref('');
+const employeeSortDirection = ref('asc');
+const employeeCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 const batchFilterOptions = computed(() => batches.value.map(batch => ({ value: batch.BATCH_NO, label: `${batch.BATCH_NO} (${batch.STATUS})` })));
 const employeeFilterCount = computed(() => [
   employeeMeritIdFilter.value,
@@ -59,6 +62,19 @@ const visibleEmployees = computed(() => {
     (!meritlistId || String(employee.MERITLIST_ID || '').toLowerCase().includes(meritlistId))
     && (!classId || String(employee.CLASS_ID || '').toLowerCase().includes(classId))
   ));
+});
+const sortedVisibleEmployees = computed(() => {
+  if (!employeeSortKey.value) return visibleEmployees.value;
+
+  const direction = employeeSortDirection.value === 'desc' ? -1 : 1;
+  return [...visibleEmployees.value].sort((leftEmployee, rightEmployee) => {
+    const left = String(leftEmployee[employeeSortKey.value] || '').trim();
+    const right = String(rightEmployee[employeeSortKey.value] || '').trim();
+    if (!left && !right) return 0;
+    if (!left) return 1;
+    if (!right) return -1;
+    return employeeCollator.compare(left, right) * direction;
+  });
 });
 const selectableEmployees = computed(() => visibleEmployees.value.filter(employee => ['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)));
 const allVisibleEmployeesSelected = computed({
@@ -199,6 +215,30 @@ function employeeStatusLabel(status) {
 
 function employeeStatusClass(status) {
   return `employee-status-${String(status || 'unknown').toLowerCase()}`;
+}
+
+function toggleEmployeeSort(key) {
+  if (employeeSortKey.value === key) {
+    employeeSortDirection.value = employeeSortDirection.value === 'asc' ? 'desc' : 'asc';
+    return;
+  }
+  employeeSortKey.value = key;
+  employeeSortDirection.value = 'asc';
+}
+
+function toggleEmployeeSortDirection() {
+  if (!employeeSortKey.value) return;
+  employeeSortDirection.value = employeeSortDirection.value === 'asc' ? 'desc' : 'asc';
+}
+
+function employeeAriaSort(key) {
+  if (employeeSortKey.value !== key) return 'none';
+  return employeeSortDirection.value === 'asc' ? 'ascending' : 'descending';
+}
+
+function employeeSortIndicator(key) {
+  if (employeeSortKey.value !== key) return '↕';
+  return employeeSortDirection.value === 'asc' ? '↑' : '↓';
 }
 
 async function createUser() {
@@ -802,6 +842,24 @@ onMounted(refresh);
               <span>{{ selectedEmployeeIds.length ? `${selectedEmployeeIds.length} selected` : 'Select eligible' }}</span>
             </label>
           </div>
+          <div class="employee-mobile-sort">
+            <label>
+              <span>Sort by</span>
+              <select v-model="employeeSortKey">
+                <option value="">Default order</option>
+                <option value="MERITLIST_ID">{{ t('Merit ID') }}</option>
+                <option value="CLASS_ID">{{ t('Class ID') }}</option>
+                <option value="NAME">{{ t('Name') }}</option>
+                <option value="PHONE">{{ t('Phone') }}</option>
+                <option value="batch_no">{{ t('Batch') }}</option>
+                <option value="APPROVAL_STATUS">{{ t('Status') }}</option>
+                <option value="IPI">{{ t('IPI') }}</option>
+              </select>
+            </label>
+            <button type="button" :disabled="!employeeSortKey" :aria-label="employeeSortDirection === 'asc' ? 'Sort descending' : 'Sort ascending'" @click="toggleEmployeeSortDirection">
+              {{ employeeSortDirection === 'asc' ? '↑ Asc' : '↓ Desc' }}
+            </button>
+          </div>
           <div class="employee-bulk-actions">
             <button class="primary" :disabled="bulkApprovalBusy || !selectedEmployeeIds.length" @click="bulkApproveEmployees(false)">{{ t(bulkApprovalBusy ? 'Approving…' : 'Approve Selected') }}</button>
             <button :disabled="bulkApprovalBusy" @click="bulkApproveEmployees(true)">{{ t('Approve All Submitted') }}</button>
@@ -814,18 +872,18 @@ onMounted(refresh);
             <thead>
               <tr>
                 <th class="select-cell"><span class="sr-only">{{ t('Select') }}</span></th>
-                <th>{{ t('Merit ID') }}</th>
-                <th>{{ t('Class ID') }}</th>
-                <th>{{ t('Name') }}</th>
-                <th>{{ t('Phone') }}</th>
-                <th>{{ t('Batch') }}</th>
-                <th>{{ t('Status') }}</th>
-                <th>{{ t('IPI') }}</th>
+                <th :aria-sort="employeeAriaSort('MERITLIST_ID')"><button class="employee-sort-button" type="button" @click="toggleEmployeeSort('MERITLIST_ID')"><span>{{ t('Merit ID') }}</span><span aria-hidden="true">{{ employeeSortIndicator('MERITLIST_ID') }}</span></button></th>
+                <th :aria-sort="employeeAriaSort('CLASS_ID')"><button class="employee-sort-button" type="button" @click="toggleEmployeeSort('CLASS_ID')"><span>{{ t('Class ID') }}</span><span aria-hidden="true">{{ employeeSortIndicator('CLASS_ID') }}</span></button></th>
+                <th :aria-sort="employeeAriaSort('NAME')"><button class="employee-sort-button" type="button" @click="toggleEmployeeSort('NAME')"><span>{{ t('Name') }}</span><span aria-hidden="true">{{ employeeSortIndicator('NAME') }}</span></button></th>
+                <th :aria-sort="employeeAriaSort('PHONE')"><button class="employee-sort-button" type="button" @click="toggleEmployeeSort('PHONE')"><span>{{ t('Phone') }}</span><span aria-hidden="true">{{ employeeSortIndicator('PHONE') }}</span></button></th>
+                <th :aria-sort="employeeAriaSort('batch_no')"><button class="employee-sort-button" type="button" @click="toggleEmployeeSort('batch_no')"><span>{{ t('Batch') }}</span><span aria-hidden="true">{{ employeeSortIndicator('batch_no') }}</span></button></th>
+                <th :aria-sort="employeeAriaSort('APPROVAL_STATUS')"><button class="employee-sort-button" type="button" @click="toggleEmployeeSort('APPROVAL_STATUS')"><span>{{ t('Status') }}</span><span aria-hidden="true">{{ employeeSortIndicator('APPROVAL_STATUS') }}</span></button></th>
+                <th :aria-sort="employeeAriaSort('IPI')"><button class="employee-sort-button" type="button" @click="toggleEmployeeSort('IPI')"><span>{{ t('IPI') }}</span><span aria-hidden="true">{{ employeeSortIndicator('IPI') }}</span></button></th>
                 <th>{{ t('Actions') }}</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="employee in visibleEmployees" :key="employee.EMP_ENTRY_ID">
+              <tr v-for="employee in sortedVisibleEmployees" :key="employee.EMP_ENTRY_ID">
                 <td class="select-cell">
                   <input v-if="['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)" v-model="selectedEmployeeIds" type="checkbox" :value="employee.EMP_ENTRY_ID" :disabled="bulkApprovalBusy" :aria-label="`${t('Select')} ${employee.NAME || employee.MERITLIST_ID}`" />
                 </td>
