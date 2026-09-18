@@ -26,6 +26,7 @@ const users = ref([]);
 const batches = ref([]);
 const requests = ref([]);
 const employees = ref([]);
+const employeeLoading = ref(false);
 const selectedEmployeeIds = ref([]);
 const bulkApprovalBusy = ref(false);
 const correctionModalOpen = ref(false);
@@ -44,6 +45,12 @@ const employeeSearch = ref('');
 const employeeMeritIdFilter = ref('');
 const employeeClassIdFilter = ref('');
 const batchFilterOptions = computed(() => batches.value.map(batch => ({ value: batch.BATCH_NO, label: `${batch.BATCH_NO} (${batch.STATUS})` })));
+const employeeFilterCount = computed(() => [
+  employeeMeritIdFilter.value,
+  employeeClassIdFilter.value,
+  employeeSearch.value,
+  employeeBatchFilter.value
+].filter(value => String(value || '').trim()).length);
 const selectableEmployees = computed(() => employees.value.filter(employee => ['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)));
 const allVisibleEmployeesSelected = computed({
   get() {
@@ -129,6 +136,7 @@ async function login() {
 
 async function refresh() {
   if (!token.value) return;
+  employeeLoading.value = true;
   try {
     const me = await api.get('/admin/me');
     currentUser.value = me.data;
@@ -157,7 +165,31 @@ async function refresh() {
     message.value = e.response?.data?.message || e.message;
     notifyError(message.value, e.response?.status === 401 ? 'Session ended' : 'Data could not be refreshed');
     if (e.response?.status === 401) logout();
+  } finally {
+    employeeLoading.value = false;
   }
+}
+
+async function clearEmployeeFilters() {
+  employeeMeritIdFilter.value = '';
+  employeeClassIdFilter.value = '';
+  employeeSearch.value = '';
+  employeeBatchFilter.value = '';
+  await refresh();
+}
+
+function employeeStatusLabel(status) {
+  return t(status === 'DRAFT'
+    ? 'Draft'
+    : status === 'PENDING'
+      ? 'Pending'
+      : status === 'APPROVED'
+        ? 'Approved'
+        : 'Rejected');
+}
+
+function employeeStatusClass(status) {
+  return `employee-status-${String(status || 'unknown').toLowerCase()}`;
 }
 
 async function createUser() {
@@ -710,20 +742,104 @@ onMounted(refresh);
         </section>
       </div>
 
-      <section v-if="activeSection === 'employees'" class="card">
-          <div class="section-title"><div><h2>{{ t('Employee List') }}</h2><p class="muted">New submissions must be approved before an employee can update their data.</p></div><div class="employee-filters"><input v-model="employeeMeritIdFilter" :aria-label="t('Merit ID')" :placeholder="t('Merit ID')" @keyup.enter="refresh" /><input v-model="employeeClassIdFilter" :aria-label="t('Class ID')" :placeholder="t('Class ID')" @keyup.enter="refresh" /><input v-model="employeeSearch" placeholder="Search name, IPI or phone" @keyup.enter="refresh" /><AutoCompleteSelect v-model="employeeBatchFilter" :options="batchFilterOptions" :placeholder="t('Search batch')" /><button @click="refresh">{{ t('Search') }}</button></div></div>
-          <div class="bulk-approval-bar">
-            <span>{{ selectedEmployeeIds.length }} {{ t('selected') }}</span>
+      <section v-if="activeSection === 'employees'" class="card employee-report">
+        <header class="employee-report-header">
+          <div>
+            <span class="employee-report-kicker">{{ t('Administration') }}</span>
+            <h2>{{ t('Employee List') }}</h2>
+            <p>Search, review, and manage employee submissions.</p>
+          </div>
+          <div class="employee-record-count" aria-live="polite">
+            <strong>{{ employees.length }}</strong>
+            <span>{{ employees.length === 1 ? 'record' : 'records' }}</span>
+          </div>
+        </header>
+
+        <form class="employee-search-panel" role="search" @submit.prevent="refresh">
+          <label class="employee-filter employee-filter-search">
+            <span>{{ t('Search') }}</span>
+            <span class="employee-search-input">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+              <input v-model="employeeSearch" placeholder="Name, IPI or phone" />
+            </span>
+          </label>
+          <label class="employee-filter">
+            <span>{{ t('Merit ID') }}</span>
+            <input v-model="employeeMeritIdFilter" :placeholder="t('Merit ID')" />
+          </label>
+          <label class="employee-filter">
+            <span>{{ t('Class ID') }}</span>
+            <input v-model="employeeClassIdFilter" :placeholder="t('Class ID')" />
+          </label>
+          <label class="employee-filter">
+            <span>{{ t('Batch') }}</span>
+            <AutoCompleteSelect v-model="employeeBatchFilter" :options="batchFilterOptions" :placeholder="t('Search batch')" />
+          </label>
+          <div class="employee-filter-actions">
+            <button class="primary" type="submit" :disabled="employeeLoading">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+              {{ employeeLoading ? 'Searching…' : t('Search') }}
+            </button>
+            <button v-if="employeeFilterCount" type="button" :disabled="employeeLoading" @click="clearEmployeeFilters">
+              Clear <span class="filter-count">{{ employeeFilterCount }}</span>
+            </button>
+          </div>
+        </form>
+
+        <div class="employee-report-toolbar">
+          <div class="employee-selection-summary">
+            <label class="employee-select-all">
+              <input v-model="allVisibleEmployeesSelected" type="checkbox" :disabled="!selectableEmployees.length || bulkApprovalBusy" :aria-label="t('Select all eligible employees on this page')" />
+              <span>{{ selectedEmployeeIds.length ? `${selectedEmployeeIds.length} selected` : 'Select eligible' }}</span>
+            </label>
+          </div>
+          <div class="employee-bulk-actions">
             <button class="primary" :disabled="bulkApprovalBusy || !selectedEmployeeIds.length" @click="bulkApproveEmployees(false)">{{ t(bulkApprovalBusy ? 'Approving…' : 'Approve Selected') }}</button>
             <button :disabled="bulkApprovalBusy" @click="bulkApproveEmployees(true)">{{ t('Approve All Submitted') }}</button>
           </div>
-          <div class="table-wrap"><table>
-            <thead><tr><th class="select-cell"><input v-model="allVisibleEmployeesSelected" type="checkbox" :disabled="!selectableEmployees.length || bulkApprovalBusy" :aria-label="t('Select all eligible employees on this page')" /></th><th>{{ t('Merit ID') }}</th><th>{{ t('Class ID') }}</th><th>{{ t('Name') }}</th><th>{{ t('Phone') }}</th><th>{{ t('Batch') }}</th><th>{{ t('Status') }}</th><th>{{ t('IPI') }}</th><th>{{ t('Actions') }}</th></tr></thead>
+        </div>
+
+        <div class="table-wrap employee-table-wrap" :class="{ 'is-loading': employeeLoading }">
+          <div v-if="employeeLoading" class="employee-loading" role="status"><span></span>Loading employees…</div>
+          <table class="employee-table">
+            <thead>
+              <tr>
+                <th class="select-cell"><span class="sr-only">{{ t('Select') }}</span></th>
+                <th>{{ t('Merit ID') }}</th>
+                <th>{{ t('Class ID') }}</th>
+                <th>{{ t('Name') }}</th>
+                <th>{{ t('Phone') }}</th>
+                <th>{{ t('Batch') }}</th>
+                <th>{{ t('Status') }}</th>
+                <th>{{ t('IPI') }}</th>
+                <th>{{ t('Actions') }}</th>
+              </tr>
+            </thead>
             <tbody>
-              <tr v-for="employee in employees" :key="employee.EMP_ENTRY_ID"><td class="select-cell"><input v-if="['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)" v-model="selectedEmployeeIds" type="checkbox" :value="employee.EMP_ENTRY_ID" :disabled="bulkApprovalBusy" :aria-label="`${t('Select')} ${employee.NAME || employee.MERITLIST_ID}`" /></td><td>{{ employee.MERITLIST_ID }}</td><td>{{ employee.CLASS_ID }}</td><td>{{ employee.NAME }}</td><td>{{ employee.PHONE }}</td><td>{{ employee.batch_no }}</td><td>{{ t(employee.APPROVAL_STATUS === 'DRAFT' ? 'Draft' : employee.APPROVAL_STATUS === 'PENDING' ? 'Pending' : employee.APPROVAL_STATUS === 'APPROVED' ? 'Approved' : 'Rejected') }}</td><td>{{ employee.IPI || t('Not assigned') }}</td><td class="actions-cell"><router-link class="button-link" :to="{ name: 'admin-employee-edit', params: { empEntryId: employee.EMP_ENTRY_ID } }">{{ t('Edit Details') }}</router-link><button v-if="['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)" class="primary" @click="approveEmployee(employee, 'APPROVED')">{{ t('Approve') }}</button><button v-if="employee.APPROVAL_STATUS === 'PENDING'" class="danger" @click="approveEmployee(employee, 'REJECTED')">{{ t('Reject') }}</button><button v-if="employee.APPROVAL_STATUS === 'APPROVED'" @click="assignIpi(employee)">{{ t(employee.IPI ? 'Change IPI' : 'Assign IPI') }}</button><button v-if="employee.APPROVAL_STATUS === 'APPROVED'" @click="openCorrectionModal(employee)">{{ t('Send for Correction') }}</button><button v-if="isSuperAdmin" class="danger" @click="deleteEmployee(employee)">{{ t('Delete') }}</button></td></tr>
-              <tr v-if="!employees.length"><td colspan="9">No employees found.</td></tr>
+              <tr v-for="employee in employees" :key="employee.EMP_ENTRY_ID">
+                <td class="select-cell">
+                  <input v-if="['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)" v-model="selectedEmployeeIds" type="checkbox" :value="employee.EMP_ENTRY_ID" :disabled="bulkApprovalBusy" :aria-label="`${t('Select')} ${employee.NAME || employee.MERITLIST_ID}`" />
+                </td>
+                <td :data-label="t('Merit ID')"><strong class="employee-id">{{ employee.MERITLIST_ID }}</strong></td>
+                <td :data-label="t('Class ID')">{{ employee.CLASS_ID }}</td>
+                <td :data-label="t('Name')"><strong class="employee-name">{{ employee.NAME || '—' }}</strong></td>
+                <td :data-label="t('Phone')">{{ employee.PHONE || '—' }}</td>
+                <td :data-label="t('Batch')"><span class="employee-batch">{{ employee.batch_no }}</span></td>
+                <td :data-label="t('Status')"><span class="employee-status" :class="employeeStatusClass(employee.APPROVAL_STATUS)">{{ employeeStatusLabel(employee.APPROVAL_STATUS) }}</span></td>
+                <td :data-label="t('IPI')">{{ employee.IPI || t('Not assigned') }}</td>
+                <td class="actions-cell employee-actions" :data-label="t('Actions')">
+                  <router-link class="button-link" :to="{ name: 'admin-employee-edit', params: { empEntryId: employee.EMP_ENTRY_ID } }">{{ t('Edit Details') }}</router-link>
+                  <button v-if="['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)" class="primary" @click="approveEmployee(employee, 'APPROVED')">{{ t('Approve') }}</button>
+                  <button v-if="employee.APPROVAL_STATUS === 'PENDING'" class="danger" @click="approveEmployee(employee, 'REJECTED')">{{ t('Reject') }}</button>
+                  <button v-if="employee.APPROVAL_STATUS === 'APPROVED'" @click="assignIpi(employee)">{{ t(employee.IPI ? 'Change IPI' : 'Assign IPI') }}</button>
+                  <button v-if="employee.APPROVAL_STATUS === 'APPROVED'" @click="openCorrectionModal(employee)">{{ t('Send for Correction') }}</button>
+                  <button v-if="isSuperAdmin" class="danger" @click="deleteEmployee(employee)">{{ t('Delete') }}</button>
+                </td>
+              </tr>
+              <tr v-if="!employees.length && !employeeLoading" class="employee-empty-row"><td colspan="9"><strong>No employees found</strong><span>Change or clear the filters and search again.</span></td></tr>
             </tbody>
-          </table></div>
+          </table>
+        </div>
       </section>
 
       <div v-if="ipiModalOpen" class="modal-backdrop" @click.self="closeIpiModal">
