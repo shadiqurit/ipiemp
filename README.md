@@ -218,12 +218,12 @@ If you already have real data in the earlier MySQL schema, do not drop it. Creat
 
 ## Outlook calendar invitations sent from the website
 
-Administrators can open `/meeting-test` after signing in at `/admin`, assign a
-recipient, and send a standard iCalendar meeting request through the configured
-SMTP mailbox. Outlook displays **Accept**, **Tentative**, and **Decline** in the
-app. The recipient's calendar reply is delivered to the sender mailbox. Select
-**Sync Outlook replies** on the page to read those replies through IMAP and
-save the latest response in MySQL.
+The meeting invitation implementation remains available in the codebase, but
+its admin test page is currently hidden and `/meeting-test` redirects to
+`/admin`. When enabled, it sends a standard iCalendar meeting request through
+the configured SMTP mailbox. Outlook displays **Accept**, **Tentative**, and
+**Decline** in the app, and IMAP reply synchronization saves responses in
+MySQL.
 
 This calendar workflow does not require a Microsoft Actionable Message
 Provider ID, Entra application, or recipient Object ID. SMTP sends invitations;

@@ -4,7 +4,6 @@ import App from './App.vue';
 import PublicView from './views/PublicView.vue';
 import AdminView from './views/AdminView.vue';
 import AdminEmployeeEditView from './views/AdminEmployeeEditView.vue';
-import MeetingTestView from './views/MeetingTestView.vue';
 import MeetingResponseView from './views/MeetingResponseView.vue';
 import './style.css';
 
@@ -13,7 +12,7 @@ const router = createRouter({
   routes: [
     { path: '/', component: PublicView },
     { path: '/admin', component: AdminView },
-    { path: '/meeting-test', component: MeetingTestView },
+    { path: '/meeting-test', redirect: '/admin' },
     { path: '/meeting-response', component: MeetingResponseView },
     {
       path: '/admin/employees/:empEntryId/edit',
