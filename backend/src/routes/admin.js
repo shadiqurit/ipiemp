@@ -580,8 +580,14 @@ router.get('/employees', async (req, res, next) => {
   try {
     const batchNo = String(req.query.batchNo || '').trim();
     const search = String(req.query.search || '').trim();
+    const meritlistId = String(req.query.meritlistId || '').trim();
+    const classId = String(req.query.classId || '').trim();
     const params = [];
     const conditions = [];
+
+    if (meritlistId.length > 100 || classId.length > 100) {
+      return res.status(400).json({ message: 'Merit ID and Class ID filters must be 100 characters or fewer.' });
+    }
 
     if (batchNo) {
       conditions.push('e.batch_no = ?');
@@ -598,6 +604,16 @@ router.get('/employees', async (req, res, next) => {
         e.PHONE LIKE ?
       )`);
       params.push(searchValue, searchValue, searchValue, searchValue, searchValue);
+    }
+
+    if (meritlistId) {
+      conditions.push('e.MERITLIST_ID LIKE ?');
+      params.push(`%${meritlistId}%`);
+    }
+
+    if (classId) {
+      conditions.push('e.CLASS_ID LIKE ?');
+      params.push(`%${classId}%`);
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';

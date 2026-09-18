@@ -41,6 +41,8 @@ const batchModalOpen = ref(false);
 const batchEditor = reactive({ originalBatchNo: '', batchNo: '', status: 'INACTIVE' });
 const employeeBatchFilter = ref('');
 const employeeSearch = ref('');
+const employeeMeritIdFilter = ref('');
+const employeeClassIdFilter = ref('');
 const batchFilterOptions = computed(() => batches.value.map(batch => ({ value: batch.BATCH_NO, label: `${batch.BATCH_NO} (${batch.STATUS})` })));
 const selectableEmployees = computed(() => employees.value.filter(employee => ['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)));
 const allVisibleEmployeesSelected = computed({
@@ -136,7 +138,9 @@ async function refresh() {
       api.get('/admin/employees', {
         params: {
           ...(employeeBatchFilter.value ? { batchNo: employeeBatchFilter.value } : {}),
-          ...(employeeSearch.value.trim() ? { search: employeeSearch.value.trim() } : {})
+          ...(employeeSearch.value.trim() ? { search: employeeSearch.value.trim() } : {}),
+          ...(employeeMeritIdFilter.value.trim() ? { meritlistId: employeeMeritIdFilter.value.trim() } : {}),
+          ...(employeeClassIdFilter.value.trim() ? { classId: employeeClassIdFilter.value.trim() } : {})
         }
       })
     ];
@@ -707,7 +711,7 @@ onMounted(refresh);
       </div>
 
       <section v-if="activeSection === 'employees'" class="card">
-          <div class="section-title"><div><h2>{{ t('Employee List') }}</h2><p class="muted">New submissions must be approved before an employee can update their data.</p></div><div class="employee-filters"><input v-model="employeeSearch" placeholder="Search name, ID, IPI or phone" @keyup.enter="refresh" /><AutoCompleteSelect v-model="employeeBatchFilter" :options="batchFilterOptions" :placeholder="t('Search batch')" /><button @click="refresh">{{ t('Search') }}</button></div></div>
+          <div class="section-title"><div><h2>{{ t('Employee List') }}</h2><p class="muted">New submissions must be approved before an employee can update their data.</p></div><div class="employee-filters"><input v-model="employeeMeritIdFilter" :aria-label="t('Merit ID')" :placeholder="t('Merit ID')" @keyup.enter="refresh" /><input v-model="employeeClassIdFilter" :aria-label="t('Class ID')" :placeholder="t('Class ID')" @keyup.enter="refresh" /><input v-model="employeeSearch" placeholder="Search name, IPI or phone" @keyup.enter="refresh" /><AutoCompleteSelect v-model="employeeBatchFilter" :options="batchFilterOptions" :placeholder="t('Search batch')" /><button @click="refresh">{{ t('Search') }}</button></div></div>
           <div class="bulk-approval-bar">
             <span>{{ selectedEmployeeIds.length }} {{ t('selected') }}</span>
             <button class="primary" :disabled="bulkApprovalBusy || !selectedEmployeeIds.length" @click="bulkApproveEmployees(false)">{{ t(bulkApprovalBusy ? 'Approving…' : 'Approve Selected') }}</button>
