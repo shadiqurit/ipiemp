@@ -634,7 +634,7 @@ onMounted(refresh);
 </script>
 
 <template>
-  <main class="page" @click.capture="clearActionFeedback">
+  <main class="page admin-page" @click.capture="clearActionFeedback">
     <section class="hero">
       <div>
         <span class="badge">{{ t('Admin') }}</span>
