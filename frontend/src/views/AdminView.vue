@@ -51,7 +51,16 @@ const employeeFilterCount = computed(() => [
   employeeSearch.value,
   employeeBatchFilter.value
 ].filter(value => String(value || '').trim()).length);
-const selectableEmployees = computed(() => employees.value.filter(employee => ['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)));
+const visibleEmployees = computed(() => {
+  const meritlistId = employeeMeritIdFilter.value.trim().toLowerCase();
+  const classId = employeeClassIdFilter.value.trim().toLowerCase();
+
+  return employees.value.filter(employee => (
+    (!meritlistId || String(employee.MERITLIST_ID || '').toLowerCase().includes(meritlistId))
+    && (!classId || String(employee.CLASS_ID || '').toLowerCase().includes(classId))
+  ));
+});
+const selectableEmployees = computed(() => visibleEmployees.value.filter(employee => ['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)));
 const allVisibleEmployeesSelected = computed({
   get() {
     return selectableEmployees.value.length > 0
@@ -750,8 +759,8 @@ onMounted(refresh);
             <p>Search, review, and manage employee submissions.</p>
           </div>
           <div class="employee-record-count" aria-live="polite">
-            <strong>{{ employees.length }}</strong>
-            <span>{{ employees.length === 1 ? 'record' : 'records' }}</span>
+            <strong>{{ visibleEmployees.length }}</strong>
+            <span>{{ visibleEmployees.length === 1 ? 'record' : 'records' }}</span>
           </div>
         </header>
 
@@ -816,7 +825,7 @@ onMounted(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="employee in employees" :key="employee.EMP_ENTRY_ID">
+              <tr v-for="employee in visibleEmployees" :key="employee.EMP_ENTRY_ID">
                 <td class="select-cell">
                   <input v-if="['PENDING', 'REJECTED'].includes(employee.APPROVAL_STATUS)" v-model="selectedEmployeeIds" type="checkbox" :value="employee.EMP_ENTRY_ID" :disabled="bulkApprovalBusy" :aria-label="`${t('Select')} ${employee.NAME || employee.MERITLIST_ID}`" />
                 </td>
@@ -836,7 +845,7 @@ onMounted(refresh);
                   <button v-if="isSuperAdmin" class="danger" @click="deleteEmployee(employee)">{{ t('Delete') }}</button>
                 </td>
               </tr>
-              <tr v-if="!employees.length && !employeeLoading" class="employee-empty-row"><td colspan="9"><strong>No employees found</strong><span>Change or clear the filters and search again.</span></td></tr>
+              <tr v-if="!visibleEmployees.length && !employeeLoading" class="employee-empty-row"><td colspan="9"><strong>No employees found</strong><span>Change or clear the filters and search again.</span></td></tr>
             </tbody>
           </table>
         </div>
