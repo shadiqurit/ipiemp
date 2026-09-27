@@ -1,0 +1,82 @@
+{
+  "up_emp": {
+    "table": "UP_EMP",
+    "columns": {
+      "MERITLIST_ID": "MERITLIST_ID",
+      "CLASS_ID": "CLASS_ID",
+      "IPI": "IPI",
+      "NAME": "NAME",
+      "batch_no": "BATCH_NO",
+      "BIRTHDATE": "BIRTHDATE",
+      "BLD_GROUP": "BLD_GROUP",
+      "GENDER": "GENDER",
+      "RELIGION": "RELIGION",
+      "NATIONALITY": "NATIONALITY",
+      "MARITAL_STATUS": "MARITAL_STATUS",
+      "EMAIL": "EMAIL",
+      "PHONE": "PHONE",
+      "PHONE1": "PHONE1",
+      "HEIGHT": "HEIGHT",
+      "WEIGHT": "WEIGHT",
+      "NID": "NID",
+      "PERMANENT_VILLAGE": "PERMANENT_VILLAGE",
+      "PERMANENT_POST": "PERMANENT_POST",
+      "PERMANENT_THANA": "PERMANENT_THANA",
+      "PERMANENT_DISTRICT": "PERMANENT_DISTRICT",
+      "PRESENT_VILLAGE": "PRESENT_VILLAGE",
+      "PRESENT_POST": "PRESENT_POST",
+      "PRESENT_THANA": "PRESENT_THANA",
+      "PRESENT_DISTRICT": "PRESENT_DISTRICT",
+      "EMGRCNY_PERSON": "EMGRCNY_PERSON",
+      "EMGRCNY_RELATION": "EMGRCNY_RELATION",
+      "EMGRCNY_ADDRESS": "EMGRCNY_ADDRESS",
+      "EMGRCNY_PHONE": "EMGRCNY_PHONE",
+      "FATHER_NAME": "FATHER_NAME",
+      "FATHER_PHONE": "FATHER_PHONE",
+      "MOTHER_NAME": "MOTHER_NAME",
+      "MOTHER_PHONE": "MOTHER_PHONE",
+      "SPOUSE_NAME": "SPOUSE_NAME",
+      "SPOSE_MARRIAGE_DATE": "SPOSE_MARRIAGE_DATE",
+      "SPOSE_OCCUPATION": "SPOSE_OCCUPATION",
+      "SPOUSE_PHONE": "SPOUSE_PHONE",
+      "GRNT_NAME": "GRNT_NAME",
+      "GRNT_RELE": "GRNT_RELE",
+      "GRNT_FATHER": "GRNT_FATHER",
+      "GRNT_PRESENT_ADD": "GRNT_PRESENT_ADD",
+      "GRNT_PERMANET_ADD": "GRNT_PERMANET_ADD",
+      "GRNT_NATIONALITY": "GRNT_NATIONALITY",
+      "GRNT_PROFFESSION": "GRNT_PROFFESSION",
+      "GRNT_NID": "GRNT_NID",
+      "GRNT_MOBILE": "GRNT_MOBILE",
+      "CREATED_AT": "CREATED_AT",
+      "UPDATED_AT": "UPDATED_AT"
+    }
+  },
+  "hr_empexamdet": {
+    "table": "HR_EMPEXAMDET",
+    "columns": {
+      "SLNO": "SLNO",
+      "EMPCODE": "EMPCODE",
+      "EXAMNAME": "EXAMNAME",
+      "EXAMGROUP": "EXAMGROUP",
+      "BOARD": "BOARD",
+      "CLAS": "CLAS",
+      "PASSYEAR": "PASSYEAR",
+      "REMARKS": "REMARKS",
+      "INSTITUTE": "INSTITUTE",
+      "SUBJECT_NAME": "SUBJECT_NAME"
+    }
+  },
+  "hr_empfamilydet": {
+    "table": "HR_EMPFAMILYDET",
+    "columns": {
+      "EMPCODE": "EMPCODE",
+      "FNAME": "FNAME",
+      "F_OCUP": "F_OCUP",
+      "F_ADD": "F_ADD",
+      "PHONE": "PHONE",
+      "CHILD_NOS": "CHILD_NOS",
+      "BIRTH_DATE": "BIRTH_DATE"
+    }
+  }
+}

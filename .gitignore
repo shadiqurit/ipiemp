@@ -10,6 +10,8 @@ backend/node_modules/
 frontend/.env
 backend/.env
 backend/ca.pem
+backend/oracle-transfer.mapping.json
+employee-oracle-*.json
 
 # Vue / Vite build
 frontend/dist/

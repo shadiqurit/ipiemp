@@ -1,5 +1,15 @@
 # Employee Portal V5 — Merit List + Class ID + Phone Verification
 
+## Transfer employee data to Oracle
+
+The admin Employee List includes **Transfer to Oracle** for selected approved
+employees with an assigned IPI. Preview and save `up_emp`, `hr_empexamdet`
+and `hr_empfamilydet` together; repeat transfers update existing matching rows.
+Configure the Oracle connection and review the target column mapping using
+[the Oracle transfer setup guide](database/ORACLE_TRANSFER.md).
+For Oracle on a local PC, choose **Download for local Oracle**, then run
+`npm run oracle:import` on that PC using the downloaded file.
+
 ## New employee identity workflow
 
 IPI is no longer required when the employee first submits data.

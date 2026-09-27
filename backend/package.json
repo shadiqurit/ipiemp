@@ -6,6 +6,7 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "admin:create": "node src/create-admin.js",
+    "oracle:import": "node src/import-oracle.js",
     "test": "node --test"
   },
   "dependencies": {
@@ -24,6 +25,7 @@
     "mailparser": "^3.9.28",
     "mysql2": "^3.14.3",
     "nodemailer": "^10.0.10",
+    "oracledb": "^7.0.1",
     "uuid": "^11.1.0"
   }
 }

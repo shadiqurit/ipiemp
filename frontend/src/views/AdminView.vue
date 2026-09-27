@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { api, setAdminToken } from '../api';
 import AutoCompleteSelect from '../components/AutoCompleteSelect.vue';
+import OracleTransfer from '../components/OracleTransfer.vue';
 import DateInput from '../components/DateInput.vue';
 import PhoneInput from '../components/PhoneInput.vue';
 import NidInput from '../components/NidInput.vue';
@@ -29,6 +30,7 @@ const employees = ref([]);
 const employeeLoading = ref(false);
 const selectedEmployeeIds = ref([]);
 const bulkApprovalBusy = ref(false);
+const oracleTransferOpen = ref(false);
 const correctionModalOpen = ref(false);
 const correctionEmployee = ref(null);
 const correctionNote = ref('');
@@ -861,6 +863,7 @@ onMounted(refresh);
             </button>
           </div>
           <div class="employee-bulk-actions">
+            <button :disabled="employeeLoading" @click="oracleTransferOpen = true">Transfer to Oracle</button>
             <button class="primary" :disabled="bulkApprovalBusy || !selectedEmployeeIds.length" @click="bulkApproveEmployees(false)">{{ t(bulkApprovalBusy ? 'Approving…' : 'Approve Selected') }}</button>
             <button :disabled="bulkApprovalBusy" @click="bulkApproveEmployees(true)">{{ t('Approve All Submitted') }}</button>
           </div>
@@ -908,6 +911,8 @@ onMounted(refresh);
           </table>
         </div>
       </section>
+
+      <OracleTransfer v-if="oracleTransferOpen" :employees="sortedVisibleEmployees" @close="oracleTransferOpen = false" />
 
       <div v-if="ipiModalOpen" class="modal-backdrop" @click.self="closeIpiModal">
         <form class="card modal ipi-modal" role="dialog" aria-modal="true" aria-labelledby="ipi-modal-title" @submit.prevent="saveIpi">
