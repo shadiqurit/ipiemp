@@ -2,8 +2,8 @@
 
 ## Transfer employee data to Oracle
 
-The admin Employee List includes **Transfer to Oracle** for selected approved
-employees with an assigned IPI. Preview and save `up_emp`, `hr_empexamdet`
+The admin Employee List includes **Transfer to Oracle** for selected employees
+with an assigned IPI, regardless of approval status. Preview and save `up_emp`, `hr_empexamdet`
 and `hr_empfamilydet` together; repeat transfers update existing matching rows.
 Configure the Oracle connection and review the target column mapping using
 [the Oracle transfer setup guide](database/ORACLE_TRANSFER.md).

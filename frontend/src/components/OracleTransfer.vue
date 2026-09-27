@@ -10,7 +10,7 @@ const preview = ref(null);
 const error = ref('');
 const result = ref(null);
 const destination = ref('local');
-const eligible = computed(() => props.employees.filter(employee => employee.APPROVAL_STATUS === 'APPROVED' && employee.IPI));
+const eligible = computed(() => props.employees.filter(employee => String(employee.IPI || '').trim()));
 
 function resetPreview() {
   preview.value = null;
@@ -77,7 +77,8 @@ async function downloadLocalFile() {
         <h2 id="oracle-transfer-title">Transfer to Oracle</h2>
         <button type="button" :disabled="busy" @click="emit('close')">Close</button>
       </div>
-      <p>Select up to 100 approved employees with an assigned IPI from the current search results. Their employee, education and family records will be saved together.</p>
+      <p>Select up to 100 employees with an assigned IPI from the current search results. Approval status does not affect transfer eligibility. Their employee, education and family records will be saved together.</p>
+      <p>{{ eligible.length }} of {{ props.employees.length }} employees have an assigned IPI. {{ props.employees.length - eligible.length }} without an IPI are excluded.</p>
       <p class="muted">Existing matching records will be updated. Records removed from the portal, and records under an earlier IPI, remain in Oracle.</p>
       <label v-if="!result" class="oracle-destination">
         Destination
@@ -88,7 +89,7 @@ async function downloadLocalFile() {
       </label>
       <p v-if="!result && destination === 'local'" class="muted">Download a transfer file, then use the local importer on the PC where Oracle is installed.</p>
       <div v-if="!result" class="oracle-selection">
-        <button type="button" :disabled="busy || !eligible.length" @click="selectAll">Select first {{ Math.min(100, eligible.length) }}</button>
+        <button type="button" :disabled="busy || !eligible.length" @click="selectAll">{{ eligible.length <= 100 ? 'Select all' : 'Select first' }} {{ Math.min(100, eligible.length) }}</button>
         <button type="button" :disabled="busy || !selected.length" @click="selected = []; resetPreview()">Clear selection</button>
         <span>{{ selected.length }} selected</span>
       </div>
@@ -100,7 +101,7 @@ async function downloadLocalFile() {
               <td><input v-model="selected" type="checkbox" :value="employee.EMP_ENTRY_ID" :disabled="busy || (selected.length >= 100 && !selected.includes(employee.EMP_ENTRY_ID))" :aria-label="`Transfer ${employee.NAME || employee.IPI}`" @change="resetPreview" /></td>
               <td>{{ employee.IPI }}</td><td>{{ employee.NAME }}</td><td>{{ employee.batch_no }}</td>
             </tr>
-            <tr v-if="!eligible.length"><td colspan="4">No approved employees with an assigned IPI in the current results.</td></tr>
+            <tr v-if="!eligible.length"><td colspan="4">No employees with an assigned IPI in the current results.</td></tr>
           </tbody>
         </table>
       </div>

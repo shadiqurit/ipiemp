@@ -61,8 +61,8 @@ export async function readSnapshot(connection, ids) {
   try {
     const [employees] = await connection.execute(`SELECT * FROM up_emp WHERE EMP_ENTRY_ID IN (${placeholders}) ORDER BY EMP_ENTRY_ID`, ids);
     if (employees.length !== ids.length) throw fail('One or more selected employees no longer exist. Refresh the list.', 409);
-    if (employees.some(row => row.APPROVAL_STATUS !== 'APPROVED' || !String(row.IPI || '').trim())) {
-      throw fail('Only approved employees with an assigned IPI can be transferred.', 409);
+    if (employees.some(row => !String(row.IPI || '').trim())) {
+      throw fail('Only employees with an assigned IPI can be transferred.', 409);
     }
     const snapshot = { up_emp: employees };
     for (const table of TABLES.slice(1)) {
@@ -87,8 +87,8 @@ export function validateSnapshot(snapshot) {
   const ids = normalizeEmployeeIds(snapshot.up_emp.map(row => row.EMP_ENTRY_ID));
   if (ids.length !== snapshot.up_emp.length) throw fail('Duplicate employee entries found in the export.');
   const ipis = new Map(snapshot.up_emp.map(row => [String(row.EMP_ENTRY_ID), row.IPI]));
-  if (snapshot.up_emp.some(row => row.APPROVAL_STATUS !== 'APPROVED' || !String(row.IPI || '').trim())) {
-    throw fail('Only approved employees with an assigned IPI can be transferred.');
+  if (snapshot.up_emp.some(row => !String(row.IPI || '').trim())) {
+    throw fail('Only employees with an assigned IPI can be transferred.');
   }
   for (const table of TABLES.slice(1)) {
     if (snapshot[table].some(row => !ipis.has(String(row.EMP_ENTRY_ID)) || row.EMPCODE !== ipis.get(String(row.EMP_ENTRY_ID)))) {

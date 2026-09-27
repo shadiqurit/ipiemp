@@ -128,8 +128,11 @@ trial insert and cannot verify these constraints or all trigger behavior.
 ## Transfer workflow
 
 1. Log in as Admin or Super Admin. Filter the Employee List by batch/search.
-2. Click **Transfer to Oracle**, then select up to 100 approved employees
-   with assigned IPIs. Selection is separate from the approval checkboxes.
+2. Click **Transfer to Oracle**, then select up to 100 employees with assigned
+   IPIs. Approval status does not restrict the transfer. Employees without IPI
+   are excluded, including drafts awaiting assignment. Selection is separate
+   from the approval checkboxes. Clear the Employee List search filters first
+   to include every batch and employee in your selection.
 3. Click **Preview transfer** to check the connection, mapping and matching
    keys and review destination row counts.
 4. Click **Save to Oracle**. The preview expires after ten minutes; source

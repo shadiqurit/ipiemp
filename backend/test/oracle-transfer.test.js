@@ -103,11 +103,15 @@ test('preview fingerprint changes with source data, destination or mapping', () 
   assert.notEqual(snapshotHash(source(), { ...settings, schema: 'OTHER' }), hash);
 });
 
-test('reads a consistent source snapshot and rejects missing, unapproved or mismatched records', async () => {
-  for (const scenario of ['valid', 'missing', 'draft', 'mismatched']) {
+test('reads all IPI-assigned employees regardless of status and rejects missing IPI or mismatched records', async () => {
+  for (const scenario of ['valid', 'pending', 'rejected', 'draftWithIpi', 'missing', 'withoutIpi', 'whitespaceIpi', 'mismatched']) {
     const data = source();
     if (scenario === 'missing') data.up_emp = [];
-    if (scenario === 'draft') data.up_emp[0].APPROVAL_STATUS = 'DRAFT';
+    if (scenario === 'pending') data.up_emp[0].APPROVAL_STATUS = 'PENDING';
+    if (scenario === 'rejected') data.up_emp[0].APPROVAL_STATUS = 'REJECTED';
+    if (scenario === 'draftWithIpi') data.up_emp[0].APPROVAL_STATUS = 'DRAFT';
+    if (scenario === 'withoutIpi') data.up_emp[0].IPI = null;
+    if (scenario === 'whitespaceIpi') data.up_emp[0].IPI = '  ';
     if (scenario === 'mismatched') data.hr_empexamdet[0].EMPCODE = 'OTHER';
     let rolledBack = false;
     const queries = [];
@@ -116,7 +120,7 @@ test('reads a consistent source snapshot and rejects missing, unapproved or mism
       async execute(sql) { return [data[TABLES.find(table => sql.includes(`FROM ${table} `))]]; },
       async rollback() { rolledBack = true; }
     };
-    if (scenario === 'valid') assert.deepEqual(await readSnapshot(mysql, ['1']), data);
+    if (['valid', 'pending', 'rejected', 'draftWithIpi'].includes(scenario)) assert.deepEqual(await readSnapshot(mysql, ['1']), data);
     else await assert.rejects(readSnapshot(mysql, ['1']));
     assert.ok(queries.includes('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY'));
     assert.ok(rolledBack);
@@ -189,6 +193,21 @@ test('portable export retains all three tables and rejects unsupported or broken
   const empty = structuredClone(packet);
   delete empty.tables.hr_empfamilydet;
   assert.throws(() => readExportPacket(empty), /must contain/);
+});
+
+test('portable exports and local imports include every status when IPI is assigned', () => {
+  for (const status of ['APPROVED', 'PENDING', 'REJECTED', 'DRAFT']) {
+    const snapshot = source();
+    snapshot.up_emp[0].APPROVAL_STATUS = status;
+    const packet = createExportPacket(snapshot);
+    assert.equal(readExportPacket(packet).up_emp[0].APPROVAL_STATUS, status);
+  }
+  for (const ipi of [null, '', '  ']) {
+    const snapshot = source();
+    snapshot.up_emp[0].IPI = ipi;
+    assert.throws(() => createExportPacket(snapshot), /assigned IPI/);
+    assert.throws(() => readExportPacket({ format: 'employee-portal-oracle', version: 1, tables: snapshot }), /assigned IPI/);
+  }
 });
 
 test('local importer previews without writing, saves all tables, and closes on a failed import', async t => {
