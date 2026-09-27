@@ -9,7 +9,6 @@ import 'dotenv/config';
 import publicRoutes from './routes/public.js';
 import adminRoutes from './routes/admin.js';
 import oracleTransferRoutes from './routes/oracle-transfer.js';
-import oracleTransferRoutes from './routes/oracle-transfer.js';
 import { meetingActionRoutes, meetingAdminRoutes, meetingPublicRoutes } from './routes/meetings.js';
 
 const app = express();
@@ -80,7 +79,6 @@ app.get('/api', (req, res) => res.json({ ok: true, service: 'Employee Portal API
 app.use('/api/public/meetings', meetingPublicRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/admin/meetings', meetingAdminRoutes);
-app.use('/api/admin/oracle', oracleTransferRoutes);
 app.use('/api/admin/oracle', oracleTransferRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/meeting', rateLimit({
