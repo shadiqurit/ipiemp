@@ -16,6 +16,10 @@ import { t } from '../i18n';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const GUARANTOR_PROFESSIONS = ['Pvt Job', 'Govt Job', 'Farmer', 'Business', 'Teacher', 'Retired', 'Others'];
+const GUARANTOR_ADDRESSES = [
+  ['GRNT_PRESENT_ADD', 'Guarantor Present Address'],
+  ['GRNT_PERMANET_ADD', 'Guarantor Permanent Address']
+];
 const GENDER_OPTIONS = [{ value: 'M', label: 'Male' }, { value: 'F', label: 'Female' }];
 const RELIGION_OPTIONS = [
   { value: 'I', label: 'Islam' }, { value: 'H', label: 'Hindu' },
@@ -347,6 +351,27 @@ function addValidationIssue(issues, step, field, label, message = '') {
   });
 }
 
+function guarantorAddressLength(field) {
+  return Array.from(employee[field] || '').length;
+}
+
+function isGuarantorAddress(field) {
+  return GUARANTOR_ADDRESSES.some(([key]) => key === field);
+}
+
+function collectGuarantorLengthIssues() {
+  const issues = [];
+  if (new TextEncoder().encode(employee.GRNT_PROFFESSION || '').length > 10) {
+    addValidationIssue(issues, 5, 'GRNT_PROFFESSION', 'Guarantor Profession', 'Select a short profession from the list.');
+  }
+  for (const [field, label] of GUARANTOR_ADDRESSES) {
+    if (guarantorAddressLength(field) > 100) {
+      addValidationIssue(issues, 5, field, label, `${label}: keep it within 100 characters.`);
+    }
+  }
+  return issues;
+}
+
 function collectFinalValidationIssues() {
   const issues = [];
 
@@ -356,9 +381,7 @@ function collectFinalValidationIssues() {
     });
   });
 
-  if (new TextEncoder().encode(employee.GRNT_PROFFESSION || '').length > 10) {
-    addValidationIssue(issues, 5, 'GRNT_PROFFESSION', 'Guarantor Profession', 'Select a short profession from the list.');
-  }
+  issues.push(...collectGuarantorLengthIssues());
 
   if (employee.MARITAL_STATUS === 'M') {
     if (!hasValue(employee.SPOUSE_NAME)) addValidationIssue(issues, 0, 'SPOUSE_NAME', 'Spouse Name');
@@ -464,11 +487,11 @@ async function submitFinal() {
 }
 
 async function save(submitForApproval = true, { quiet = false } = {}) {
-  if (new TextEncoder().encode(employee.GRNT_PROFFESSION || '').length > 10) {
-    const issue = { step: 5, field: 'GRNT_PROFFESSION', label: 'Guarantor Profession', message: 'Select a short profession from the list.' };
-    validationIssues.value = [issue];
-    await focusIssue(issue);
-    notifyError(issue.message, 'Form needs attention');
+  const lengthIssues = collectGuarantorLengthIssues();
+  if (lengthIssues.length) {
+    validationIssues.value = lengthIssues;
+    await focusIssue(lengthIssues[0]);
+    notifyError(lengthIssues[0].message, 'Form needs attention');
     return false;
   }
   busy.value = true;
@@ -987,7 +1010,19 @@ onMounted(async () => {
               <option v-if="employee[key] && !GUARANTOR_PROFESSIONS.includes(employee[key])" :value="employee[key]" :disabled="editable">{{ employee[key] }}</option>
               <option v-for="profession in GUARANTOR_PROFESSIONS" :key="profession" :value="profession">{{ profession }}</option>
             </select>
+            <input
+              v-else-if="isGuarantorAddress(key)"
+              v-model="employee[key]"
+              :disabled="!editable"
+              :aria-invalid="guarantorAddressLength(key) > 100"
+              :aria-describedby="`${key}-length`"
+              :class="{ 'field-error': guarantorAddressLength(key) > 100 }"
+              @input="validationIssues = validationIssues.filter(issue => issue.field !== key)"
+            />
             <input v-else v-model="employee[key]" :disabled="!editable" />
+            <small v-if="isGuarantorAddress(key)" :id="`${key}-length`" class="field-hint" :style="guarantorAddressLength(key) > 100 ? { color: 'var(--red-600)' } : {}" :role="guarantorAddressLength(key) > 100 ? 'alert' : undefined">
+              {{ guarantorAddressLength(key) }} / 100 · {{ t(guarantorAddressLength(key) > 100 ? 'Keep this address within 100 characters.' : 'Maximum 100 characters.') }}
+            </small>
           </div>
         </div>
       </section>

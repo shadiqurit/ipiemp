@@ -90,6 +90,8 @@ const bn = {
   'Guarantor Father': 'জামিনদারের পিতার নাম',
   'Guarantor Present Address': 'জামিনদারের বর্তমান ঠিকানা',
   'Guarantor Permanent Address': 'জামিনদারের স্থায়ী ঠিকানা',
+  'Keep this address within 100 characters.': 'এই ঠিকানাটি ১০০ অক্ষরের মধ্যে রাখুন।',
+  'Maximum 100 characters.': 'সর্বোচ্চ ১০০ অক্ষর।',
   'Guarantor Nationality': 'জামিনদারের জাতীয়তা',
   'Guarantor Profession': 'জামিনদারের পেশা',
   'Guarantor NID': 'জামিনদারের জাতীয় পরিচয়পত্র',

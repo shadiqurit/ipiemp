@@ -49,3 +49,16 @@ export function validateGuarantorProfession(employee) {
     throw Object.assign(new Error('Select a short guarantor profession from the list (maximum 10 bytes).'), { status: 400 });
   }
 }
+
+export function validateGuarantorAddresses(employee) {
+  for (const [field, label] of [
+    ['GRNT_PRESENT_ADD', 'Guarantor present address'],
+    ['GRNT_PERMANET_ADD', 'Guarantor permanent address']
+  ]) {
+    const value = employee[field];
+    if (value === null || value === undefined || value === '') continue;
+    if (typeof value !== 'string' || Array.from(value).length > 100) {
+      throw Object.assign(new Error(`${label}: keep it within 100 characters.`), { status: 400 });
+    }
+  }
+}
