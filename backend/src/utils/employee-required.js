@@ -41,3 +41,11 @@ export function validateRequiredEmployeeFields(employee) {
     }
   }
 }
+
+export function validateGuarantorProfession(employee) {
+  const value = employee.GRNT_PROFFESSION;
+  if (value === null || value === undefined || value === '') return;
+  if (typeof value !== 'string' || Buffer.byteLength(value, 'utf8') > 10) {
+    throw Object.assign(new Error('Select a short guarantor profession from the list (maximum 10 bytes).'), { status: 400 });
+  }
+}

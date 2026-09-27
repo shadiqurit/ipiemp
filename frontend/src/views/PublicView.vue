@@ -15,6 +15,7 @@ import { notifyError, notifySuccess } from '../utils/notifications';
 import { t } from '../i18n';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const GUARANTOR_PROFESSIONS = ['Pvt Job', 'Govt Job', 'Farmer', 'Business', 'Teacher', 'Retired', 'Others'];
 const GENDER_OPTIONS = [{ value: 'M', label: 'Male' }, { value: 'F', label: 'Female' }];
 const RELIGION_OPTIONS = [
   { value: 'I', label: 'Islam' }, { value: 'H', label: 'Hindu' },
@@ -355,6 +356,10 @@ function collectFinalValidationIssues() {
     });
   });
 
+  if (new TextEncoder().encode(employee.GRNT_PROFFESSION || '').length > 10) {
+    addValidationIssue(issues, 5, 'GRNT_PROFFESSION', 'Guarantor Profession', 'Select a short profession from the list.');
+  }
+
   if (employee.MARITAL_STATUS === 'M') {
     if (!hasValue(employee.SPOUSE_NAME)) addValidationIssue(issues, 0, 'SPOUSE_NAME', 'Spouse Name');
     if (!hasValue(employee.SPOUSE_PHONE)) addValidationIssue(issues, 0, 'SPOUSE_PHONE', 'Spouse Phone');
@@ -459,6 +464,13 @@ async function submitFinal() {
 }
 
 async function save(submitForApproval = true, { quiet = false } = {}) {
+  if (new TextEncoder().encode(employee.GRNT_PROFFESSION || '').length > 10) {
+    const issue = { step: 5, field: 'GRNT_PROFFESSION', label: 'Guarantor Profession', message: 'Select a short profession from the list.' };
+    validationIssues.value = [issue];
+    await focusIssue(issue);
+    notifyError(issue.message, 'Form needs attention');
+    return false;
+  }
   busy.value = true;
 
   try {
@@ -970,6 +982,11 @@ onMounted(async () => {
             <label>{{ t(label) }}<span class="required-mark"> *</span></label>
             <PhoneInput v-if="key === 'GRNT_MOBILE'" v-model="employee[key]" :disabled="!editable" />
             <NidInput v-else-if="key === 'GRNT_NID'" v-model="employee[key]" :disabled="!editable" />
+            <select v-else-if="key === 'GRNT_PROFFESSION'" v-model="employee[key]" :disabled="!editable" :required="editable">
+              <option value="">{{ t('Select') }}</option>
+              <option v-if="employee[key] && !GUARANTOR_PROFESSIONS.includes(employee[key])" :value="employee[key]" :disabled="editable">{{ employee[key] }}</option>
+              <option v-for="profession in GUARANTOR_PROFESSIONS" :key="profession" :value="profession">{{ profession }}</option>
+            </select>
             <input v-else v-model="employee[key]" :disabled="!editable" />
           </div>
         </div>

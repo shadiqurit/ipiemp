@@ -11,7 +11,7 @@ import { validateAndNormalizeEducation } from '../utils/education.js';
 import { normalizeAndValidateMeasurements } from '../utils/measurements.js';
 import { normalizeAndValidateEmployeeNids } from '../utils/nid.js';
 import { validateAndNormalizeChildren } from '../utils/children.js';
-import { validateRequiredEmployeeFields } from '../utils/employee-required.js';
+import { validateRequiredEmployeeFields, validateGuarantorProfession } from '../utils/employee-required.js';
 
 const router = Router();
 
@@ -43,6 +43,7 @@ function cleanObj(input, columns) {
 }
 
 function validateEmployee(e, { required = true } = {}) {
+  validateGuarantorProfession(e);
   if (required) {
     validateRequiredEmployeeFields(e);
   }
