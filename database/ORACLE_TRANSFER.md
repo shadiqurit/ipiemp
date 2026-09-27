@@ -34,6 +34,18 @@ Your three Oracle tables already exist. Review the mapping against them;
 run `database/oracle_table_metadata.sql` as the table owner to retrieve
 the column definitions and keys. The importer checks them before saving.
 
+If your Oracle tables use the portal's `EMP_ENTRY_ID` and `FAMILY_ID` columns,
+use the matching template instead:
+
+```powershell
+Copy-Item oracle-transfer.portal-schema.example.json oracle-transfer.mapping.json
+```
+
+This template preserves source relational IDs and approval fields. It matches
+employees by `EMP_ENTRY_ID`, education by `EMP_ENTRY_ID` + `SLNO`, and family
+rows by `EMP_ENTRY_ID` + `CHILD_NOS`. Use it when Oracle is a copy of this
+portal's schema and source IDs identify the same employees in both databases.
+
 For each download, preview first, then save:
 
 ```powershell
@@ -99,6 +111,11 @@ target columns. Review existing data and keys with the Oracle administrator
 before adding any constraints. The Oracle account needs metadata visibility
 and SELECT, INSERT and UPDATE access for all three destination tables.
 
+A table mapping may specify a `keys` array of MySQL column names to use your
+existing Oracle primary/unique key, for example `"keys": ["EMP_ENTRY_ID"]`.
+Those columns must also appear in `columns`. If omitted, the IPI/EMPCODE
+matching keys in the table above are used.
+
 Preflight rejects missing columns, generated mapped columns, unsupported
 types, required unmapped columns without defaults, and missing unique keys.
 Supported types are VARCHAR2, NVARCHAR2, CHAR, NCHAR, NUMBER, FLOAT, DATE and
@@ -125,9 +142,10 @@ rollback. Repeat transfers update matching rows and insert new rows. No
 MySQL records are changed. Transfers sharing the same MySQL server are
 serialized with a connection-scoped advisory lock.
 
-Rows removed from MySQL remain in Oracle. Changing an IPI, education SLNO or
-child number creates a new matching identity and leaves the previous Oracle
-record in place; reconcile such changes separately. The transfer updates
+Rows removed from MySQL remain in Oracle. Changing a configured matching key
+creates a new matching identity and leaves the previous Oracle record in place;
+reconcile such changes separately. With the portal-schema template, IPI is an
+updated field rather than a matching key. The transfer updates
 only the columns explicitly mapped, including nulls. Oracle triggers with
 autonomous transactions or external side effects require separate review.
 

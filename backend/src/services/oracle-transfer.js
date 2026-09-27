@@ -6,6 +6,7 @@ export const TABLES = ['up_emp', 'hr_empexamdet', 'hr_empfamilydet'];
 const KEYS = { up_emp: ['IPI'], hr_empexamdet: ['EMPCODE', 'SLNO'], hr_empfamilydet: ['EMPCODE', 'CHILD_NOS'] };
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 const identifier = value => typeof value === 'string' && /^[A-Z][A-Z0-9_]{0,127}$/.test(value);
+const matchingKeys = (source, mapping) => mapping.keys ?? KEYS[source];
 
 export function normalizeEmployeeIds(value) {
   if (!Array.isArray(value) || !value.length || value.length > 100
@@ -32,11 +33,13 @@ export function readOracleSettings(env = process.env) {
 export function validateMapping(mapping) {
   for (const table of TABLES) {
     const entry = mapping?.[table];
+    const keys = entry ? matchingKeys(table, entry) : [];
     if (!entry || !identifier(entry.table) || !entry.columns || Array.isArray(entry.columns)
         || !Object.keys(entry.columns).length
         || Object.entries(entry.columns).some(([source, target]) => !/^[A-Za-z][A-Za-z0-9_]*$/.test(source) || !identifier(target))
         || new Set(Object.values(entry.columns)).size !== Object.keys(entry.columns).length
-        || KEYS[table].some(key => !entry.columns[key])) {
+        || !Array.isArray(keys) || !keys.length || new Set(keys).size !== keys.length
+        || keys.some(key => typeof key !== 'string' || !Object.hasOwn(entry.columns, key))) {
       throw fail(`Invalid column mapping for ${table}. Map every matching key and use unique Oracle column names.`, 503);
     }
   }
@@ -158,7 +161,8 @@ export async function preparePlans(oracle, snapshot, settings) {
     }
     const required = metadata.filter(row => row.NULLABLE === 'N' && !row.DATA_DEFAULT && row.VIRTUAL_COLUMN !== 'YES' && row.IDENTITY_COLUMN !== 'YES' && !targetColumns.has(row.COLUMN_NAME));
     if (required.length) throw fail(`Map required Oracle columns in ${mapping.table}: ${required.map(row => row.COLUMN_NAME).join(', ')}.`, 409);
-    const keys = KEYS[source].map(key => mapping.columns[key]);
+    const sourceKeys = matchingKeys(source, mapping);
+    const keys = sourceKeys.map(key => mapping.columns[key]);
     const { rows: constraints } = await oracle.execute(
       `SELECT c.CONSTRAINT_NAME, cc.COLUMN_NAME FROM ALL_CONSTRAINTS c
        JOIN ALL_CONS_COLUMNS cc ON cc.OWNER = c.OWNER AND cc.CONSTRAINT_NAME = c.CONSTRAINT_NAME AND cc.TABLE_NAME = c.TABLE_NAME
@@ -174,7 +178,7 @@ export async function preparePlans(oracle, snapshot, settings) {
     const seen = new Set();
     const rows = sourceRows.map(row => {
       if (columns.some(([column]) => !Object.hasOwn(row, column))) throw fail(`Source columns for ${source} do not match the configured mapping.`, 409);
-      const key = KEYS[source].map(column => row[column]);
+      const key = sourceKeys.map(column => row[column]);
       if (key.some(value => value === null || value === undefined || String(value).trim() === '')) throw fail(`A matching key is empty in ${source}.`, 409);
       const serializedKey = JSON.stringify(key);
       if (seen.has(serializedKey)) throw fail(`Duplicate matching keys found in ${source}.`, 409);

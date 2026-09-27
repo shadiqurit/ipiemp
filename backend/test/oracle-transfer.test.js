@@ -50,6 +50,37 @@ test('requires explicit configuration and prevents SQL injection through mapping
   assert.throws(() => validateMapping(bad), /Invalid column mapping/);
   bad.up_emp = { table: 'UP_EMP', columns: { NAME: 'NAME' } };
   assert.throws(() => validateMapping(bad), /Invalid column mapping/);
+  for (const invalid of [[], ['MISSING'], ['IPI', 'IPI'], 'IPI']) {
+    const configured = structuredClone(mapping);
+    configured.up_emp.keys = invalid;
+    assert.throws(() => validateMapping(configured), /Invalid column mapping/);
+  }
+});
+
+test('supports existing portal-schema primary keys and preserves relational IDs', async () => {
+  const configured = structuredClone(mapping);
+  for (const entry of Object.values(configured)) entry.columns.EMP_ENTRY_ID = 'EMP_ENTRY_ID';
+  configured.up_emp.keys = ['EMP_ENTRY_ID'];
+  configured.hr_empexamdet.keys = ['EMP_ENTRY_ID', 'SLNO'];
+  configured.hr_empfamilydet.keys = ['EMP_ENTRY_ID', 'CHILD_NOS'];
+  configured.hr_empfamilydet.columns.FAMILY_ID = 'FAMILY_ID';
+  validateMapping(configured);
+  const snapshot = source();
+  snapshot.hr_empfamilydet[0].FAMILY_ID = 10;
+  const oracle = { async execute(sql, binds) {
+    const entry = Object.values(configured).find(value => value.table === binds.tableName);
+    if (sql.includes('ALL_TAB_COLS')) return { rows: Object.values(entry.columns).map(column => ({
+      COLUMN_NAME: column,
+      DATA_TYPE: ['EMP_ENTRY_ID', 'FAMILY_ID', 'SLNO', 'CHILD_NOS'].includes(column) ? 'NUMBER' : column === 'BIRTHDATE' ? 'DATE' : 'VARCHAR2',
+      NULLABLE: column === 'EMP_ENTRY_ID' ? 'N' : 'Y', DATA_DEFAULT: null, VIRTUAL_COLUMN: 'NO', IDENTITY_COLUMN: 'NO'
+    })) };
+    return { rows: entry.keys.map(key => ({ CONSTRAINT_NAME: 'EXISTING_KEY', COLUMN_NAME: entry.columns[key] })) };
+  } };
+  const plans = await preparePlans(oracle, snapshot, { ...settings, mapping: configured });
+  assert.match(plans[0].sql, /ON \(t.EMP_ENTRY_ID = s.EMP_ENTRY_ID\)/);
+  assert.match(plans[1].sql, /ON \(t.EMP_ENTRY_ID = s.EMP_ENTRY_ID AND t.SLNO = s.SLNO\)/);
+  assert.match(plans[2].sql, /ON \(t.EMP_ENTRY_ID = s.EMP_ENTRY_ID AND t.CHILD_NOS = s.CHILD_NOS\)/);
+  assert.equal(plans[2].rows[0].b4, 10);
 });
 
 test('keeps text and dates in bind parameters, including nulls and Unicode', () => {
