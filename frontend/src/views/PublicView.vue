@@ -1013,6 +1013,7 @@ onMounted(async () => {
             <input
               v-else-if="isGuarantorAddress(key)"
               v-model="employee[key]"
+              placeholder="Vill: VillageName , Post: PostName, Thana:ThanaName , Dist: DistrictName"
               :disabled="!editable"
               :aria-invalid="guarantorAddressLength(key) > 100"
               :aria-describedby="`${key}-length`"
