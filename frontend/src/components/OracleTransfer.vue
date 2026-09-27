@@ -10,6 +10,8 @@ const preview = ref(null);
 const error = ref('');
 const result = ref(null);
 const destination = ref('local');
+const downloadBytes = ref(0);
+const downloadController = ref(null);
 const eligible = computed(() => props.employees.filter(employee => String(employee.IPI || '').trim()));
 
 function resetPreview() {
@@ -47,10 +49,25 @@ async function run(action) {
 async function downloadLocalFile() {
   busy.value = true;
   error.value = '';
+  downloadBytes.value = 0;
+  downloadController.value = new AbortController();
   try {
-    const { data } = await api.post('/admin/oracle/export', { employeeIds: selected.value }, { timeout: 180000 });
-    const filename = `employee-oracle-${data.exportedAt.replace(/[:.]/g, '-')}.json`;
-    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    const { data, headers } = await api.post('/admin/oracle/export', { employeeIds: selected.value }, {
+      responseType: 'blob',
+      timeout: 30000,
+      signal: downloadController.value.signal,
+      onDownloadProgress: event => { downloadBytes.value = event.loaded; }
+    });
+    const filename = /filename="([^"]+)"/.exec(headers['content-disposition'] || '')?.[1]
+      || `employee-oracle-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    let counts;
+    if (headers['x-oracle-row-counts']) counts = JSON.parse(headers['x-oracle-row-counts']);
+    else {
+      // Compatibility while the API and frontend are deployed separately.
+      const packet = JSON.parse(await data.text());
+      counts = Object.entries(packet.tables).map(([source, rows]) => ({ source, rows: rows.length }));
+    }
+    const url = URL.createObjectURL(data);
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
@@ -61,12 +78,18 @@ async function downloadLocalFile() {
     result.value = {
       downloaded: true,
       message: `Download ready: ${filename}. Import this file on your Oracle PC to save the data.`,
-      tables: Object.entries(data.tables).map(([table, rows]) => ({ source: table, target: table, rows: rows.length }))
+      tables: counts.map(table => ({ ...table, target: table.source }))
     };
     preview.value = null;
   } catch (e) {
-    error.value = e.response?.data?.message || 'The export could not be downloaded. Try again.';
-  } finally { busy.value = false; }
+    let message = e.response?.data?.message;
+    if (e.response?.data instanceof Blob) {
+      try { message = JSON.parse(await e.response.data.text()).message; } catch { /* Use the download error below. */ }
+    }
+    error.value = e.code === 'ERR_CANCELED' ? 'Download canceled.' : message || (e.code === 'ECONNABORTED'
+      ? 'The download timed out. Retry; if it persists, check the website server’s MySQL connection.'
+      : 'The export could not be downloaded. Try again.');
+  } finally { busy.value = false; downloadController.value = null; }
 }
 </script>
 
@@ -88,6 +111,7 @@ async function downloadLocalFile() {
         </select>
       </label>
       <p v-if="!result && destination === 'local'" class="muted">Download a transfer file, then use the local importer on the PC where Oracle is installed.</p>
+      <p v-if="downloadController" role="status" aria-live="polite">{{ downloadBytes ? `Receiving file: ${Math.ceil(downloadBytes / 1024)} KB` : 'Preparing download…' }}</p>
       <div v-if="!result" class="oracle-selection">
         <button type="button" :disabled="busy || !eligible.length" @click="selectAll">{{ eligible.length <= 100 ? 'Select all' : 'Select first' }} {{ Math.min(100, eligible.length) }}</button>
         <button type="button" :disabled="busy || !selected.length" @click="selected = []; resetPreview()">Clear selection</button>
@@ -118,6 +142,7 @@ async function downloadLocalFile() {
       </div>
       <div v-if="!result" class="modal-actions">
         <button v-if="destination === 'local'" class="primary" type="button" :disabled="busy || !selected.length" @click="downloadLocalFile">{{ busy ? 'Downloading…' : 'Download for local Oracle' }}</button>
+        <button v-if="downloadController" type="button" @click="downloadController.abort()">Cancel download</button>
         <button v-else type="button" :disabled="busy || !selected.length" @click="run('preview')">{{ busy ? 'Working…' : 'Preview transfer' }}</button>
         <button v-if="destination === 'server' && preview" class="primary" type="button" :disabled="busy" @click="run('transfer')">{{ busy ? 'Saving…' : 'Save to Oracle' }}</button>
       </div>

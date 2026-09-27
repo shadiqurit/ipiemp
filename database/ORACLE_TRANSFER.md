@@ -14,6 +14,15 @@ of the selected employees and their two child tables. The website needs no
 Oracle credentials for this option. Install this updated application on the
 website before using the new download button.
 
+Downloads use compressed JSON when the browser supports it, show received
+file size and can be canceled. The export has a 20-second server deadline;
+the browser waits at most 30 seconds. A database stall returns an error
+instead of leaving the download waiting for minutes. Server logs include
+`Oracle export completed` with duration, file size and row counts, or
+`Oracle export timed out` with the stage (`authorization`, `waiting for
+MySQL`, `reading employee tables`, or `preparing file`). These logs exclude
+employee records and credentials.
+
 On your local Oracle PC, install Node.js 22 or newer and copy the `backend`
 folder (without `node_modules`) from this project. In PowerShell, enter that
 folder and set up the importer:

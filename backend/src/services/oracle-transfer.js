@@ -59,7 +59,7 @@ export async function readSnapshot(connection, ids) {
   await connection.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
   await connection.query('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY');
   try {
-    const [employees] = await connection.execute(`SELECT * FROM up_emp WHERE EMP_ENTRY_ID IN (${placeholders}) ORDER BY EMP_ENTRY_ID`, ids);
+    const [employees] = await connection.query(`SELECT * FROM up_emp WHERE EMP_ENTRY_ID IN (${placeholders}) ORDER BY EMP_ENTRY_ID`, ids);
     if (employees.length !== ids.length) throw fail('One or more selected employees no longer exist. Refresh the list.', 409);
     if (employees.some(row => !String(row.IPI || '').trim())) {
       throw fail('Only employees with an assigned IPI can be transferred.', 409);
@@ -67,7 +67,7 @@ export async function readSnapshot(connection, ids) {
     const snapshot = { up_emp: employees };
     for (const table of TABLES.slice(1)) {
       const order = table === 'hr_empexamdet' ? 'SLNO' : 'CHILD_NOS';
-      const [rows] = await connection.execute(`SELECT * FROM ${table} WHERE EMP_ENTRY_ID IN (${placeholders}) ORDER BY EMP_ENTRY_ID, ${order}`, ids);
+      const [rows] = await connection.query(`SELECT * FROM ${table} WHERE EMP_ENTRY_ID IN (${placeholders}) ORDER BY EMP_ENTRY_ID, ${order}`, ids);
       const ipis = new Map(employees.map(row => [String(row.EMP_ENTRY_ID), row.IPI]));
       if (rows.some(row => row.EMPCODE !== ipis.get(String(row.EMP_ENTRY_ID)))) {
         throw fail(`Employee codes in ${table} do not match their assigned IPI. Correct them before transferring.`, 409);

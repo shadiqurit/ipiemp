@@ -2,25 +2,14 @@ import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db.js';
 import { requireAdmin } from '../auth.js';
-import { normalizeEmployeeIds, readOracleSettings, openOracle, readSnapshot, snapshotHash, preparePlans, savePlans, createExportPacket } from '../services/oracle-transfer.js';
+import { normalizeEmployeeIds, readOracleSettings, openOracle, readSnapshot, snapshotHash, preparePlans, savePlans } from '../services/oracle-transfer.js';
+import { createOracleExportHandlers } from '../services/oracle-export.js';
 
 const router = Router();
-router.use(requireAdmin);
 
 // This download needs only the site's MySQL connection. Import on the Oracle PC.
-router.post('/export', async (req, res, next) => {
-  let mysql;
-  try {
-    const ids = normalizeEmployeeIds(req.body?.employeeIds);
-    mysql = await pool.getConnection();
-    const snapshot = await readSnapshot(mysql, ids);
-    const filename = `employee-oracle-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Cache-Control', 'no-store');
-    res.json(createExportPacket(snapshot));
-  } catch (error) { next(error); }
-  finally { mysql?.release(); }
-});
+router.post('/export', ...createOracleExportHandlers({ pool, authorize: requireAdmin }));
+router.use(requireAdmin);
 
 // A signed preview binds this admin, source snapshot and destination together.
 router.post('/:action', async (req, res, next) => {

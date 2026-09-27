@@ -116,8 +116,10 @@ test('reads all IPI-assigned employees regardless of status and rejects missing 
     let rolledBack = false;
     const queries = [];
     const mysql = {
-      async query(sql) { queries.push(sql); },
-      async execute(sql) { return [data[TABLES.find(table => sql.includes(`FROM ${table} `))]]; },
+      async query(sql) {
+        queries.push(sql);
+        if (sql.startsWith('SELECT')) return [data[TABLES.find(table => sql.includes(`FROM ${table} `))]];
+      },
       async rollback() { rolledBack = true; }
     };
     if (['valid', 'pending', 'rejected', 'draftWithIpi'].includes(scenario)) assert.deepEqual(await readSnapshot(mysql, ['1']), data);
